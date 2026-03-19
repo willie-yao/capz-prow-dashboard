@@ -136,15 +136,15 @@ func ExtractFailureLocation(failureBody string) (location string, url string) {
 	}
 	location += filePath + ":" + line
 
-	// Find the GitHub repo for this module path, trying progressively shorter prefixes.
+	// Find the GitHub repo for this module path, using the longest matching prefix.
 	var ghRepo string
 	var subPath string
+	var bestLen int
 	for prefix, repo := range knownRepos {
-		if strings.HasPrefix(modulePath, prefix) {
-			if len(prefix) > len(subPath) || ghRepo == "" {
-				ghRepo = repo
-				subPath = strings.TrimPrefix(modulePath, prefix)
-			}
+		if strings.HasPrefix(modulePath, prefix) && len(prefix) > bestLen {
+			ghRepo = repo
+			subPath = strings.TrimPrefix(modulePath, prefix)
+			bestLen = len(prefix)
 		}
 	}
 	if ghRepo == "" {
