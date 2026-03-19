@@ -1,0 +1,17 @@
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { DashboardPage } from "./pages/DashboardPage";
+import { JobDetailPage } from "./pages/JobDetailPage";
+import { Layout } from "./components/Layout";
+
+export default function App() {
+  return (
+    <BrowserRouter basename="/capz-prow-dashboard">
+      <Routes>
+        <Route element={<Layout />}>
+          <Route index element={<DashboardPage />} />
+          <Route path="job/:jobName" element={<JobDetailPage />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
+}
