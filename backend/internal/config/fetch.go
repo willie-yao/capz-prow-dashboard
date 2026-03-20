@@ -2,32 +2,35 @@ package config
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/willie-yao/capz-prow-dashboard/backend/internal/models"
 )
 
-const baseURL = "https://raw.githubusercontent.com/kubernetes/test-infra/master/config/jobs/kubernetes-sigs/cluster-api-provider-azure/"
+const (
+	rawBaseURL = "https://raw.githubusercontent.com/kubernetes/test-infra/master/config/jobs/kubernetes-sigs/cluster-api-provider-azure/"
+	// GitHub API endpoint to list files in the CAPZ config directory.
+	apiListURL = "https://api.github.com/repos/kubernetes/test-infra/contents/config/jobs/kubernetes-sigs/cluster-api-provider-azure"
+	filePrefix = "cluster-api-provider-azure-"
+)
 
-// configFiles is the list of CAPZ Prow config YAML files to fetch.
-var configFiles = []string{
-	"cluster-api-provider-azure-periodics-main.yaml",
-	"cluster-api-provider-azure-periodics-main-upgrades.yaml",
-	"cluster-api-provider-azure-periodics-v1beta1-release-1.21.yaml",
-	"cluster-api-provider-azure-periodics-v1beta1-release-1.22.yaml",
-	"cluster-api-provider-azure-presubmits-main.yaml",
-	"cluster-api-provider-azure-presubmits-release-v1beta1.yaml",
-}
-
-// FetchJobConfigs downloads all known CAPZ config YAMLs from the
-// kubernetes/test-infra repository on GitHub and returns the parsed jobs.
+// FetchJobConfigs discovers all CAPZ config YAMLs from the
+// kubernetes/test-infra repository via the GitHub API, downloads them,
+// and returns the parsed jobs. This automatically picks up new release
+// branches or removed files without code changes.
 func FetchJobConfigs(ctx context.Context, client *http.Client) ([]models.ProwJob, error) {
-	var allJobs []models.ProwJob
+	files, err := discoverConfigFiles(ctx, client)
+	if err != nil {
+		return nil, fmt.Errorf("discovering config files: %w", err)
+	}
 
-	for _, file := range configFiles {
-		url := baseURL + file
+	var allJobs []models.ProwJob
+	for _, file := range files {
+		url := rawBaseURL + file
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
@@ -57,4 +60,54 @@ func FetchJobConfigs(ctx context.Context, client *http.Client) ([]models.ProwJob
 	}
 
 	return allJobs, nil
+}
+
+// discoverConfigFiles uses the GitHub Contents API to list YAML files in the
+// CAPZ config directory, filtering to only CAPZ job config files (skipping
+// presets and other non-job files).
+func discoverConfigFiles(ctx context.Context, client *http.Client) ([]string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiListURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("listing directory: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("listing directory: HTTP %d", resp.StatusCode)
+	}
+
+	var entries []struct {
+		Name string `json:"name"`
+		Type string `json:"type"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&entries); err != nil {
+		return nil, fmt.Errorf("parsing directory listing: %w", err)
+	}
+
+	var files []string
+	for _, e := range entries {
+		// Only include CAPZ job YAML files (periodics + presubmits), skip presets.
+		if e.Type != "file" {
+			continue
+		}
+		if !strings.HasPrefix(e.Name, filePrefix) || !strings.HasSuffix(e.Name, ".yaml") {
+			continue
+		}
+		if strings.Contains(e.Name, "presets") {
+			continue
+		}
+		files = append(files, e.Name)
+	}
+
+	if len(files) == 0 {
+		return nil, fmt.Errorf("no CAPZ config files found in directory listing")
+	}
+
+	return files, nil
 }
