@@ -33,13 +33,28 @@ type BuildInfo struct {
 
 // TestCase represents a single test case from JUnit XML.
 type TestCase struct {
-	Name             string  `json:"name"`
-	Status           string  `json:"status"` // "passed", "failed", "skipped"
-	DurationSeconds  float64 `json:"duration_seconds"`
-	FailureMessage   string  `json:"failure_message,omitempty"`
-	FailureBody      string  `json:"failure_body,omitempty"`
-	FailureLocation  string  `json:"failure_location,omitempty"`
-	FailureLocURL    string  `json:"failure_location_url,omitempty"`
+	Name             string            `json:"name"`
+	Status           string            `json:"status"` // "passed", "failed", "skipped"
+	DurationSeconds  float64           `json:"duration_seconds"`
+	FailureMessage   string            `json:"failure_message,omitempty"`
+	FailureBody      string            `json:"failure_body,omitempty"`
+	FailureLocation  string            `json:"failure_location,omitempty"`
+	FailureLocURL    string            `json:"failure_location_url,omitempty"`
+	ClusterArtifacts *ClusterArtifacts `json:"cluster_artifacts,omitempty"`
+}
+
+// ClusterArtifacts holds links to debug artifacts for a specific cluster.
+type ClusterArtifacts struct {
+	ClusterName      string             `json:"cluster_name"`
+	AzureActivityLog string             `json:"azure_activity_log,omitempty"`
+	Machines         []MachineArtifacts `json:"machines,omitempty"`
+	PodLogDirs       []string           `json:"pod_log_dirs,omitempty"`
+}
+
+// MachineArtifacts holds links to per-machine debug logs.
+type MachineArtifacts struct {
+	Name string            `json:"name"`
+	Logs map[string]string `json:"logs"`
 }
 
 // BuildResult is a complete result for a single build: metadata + test cases.

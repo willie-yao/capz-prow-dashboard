@@ -186,6 +186,61 @@ export function TestCaseTable({ testCases }: TestCaseTableProps) {
                           )}
                         </div>
                       )}
+
+                      {/* Cluster artifact links */}
+                      {tc.cluster_artifacts && (
+                        <div className="rounded-lg border border-outline-variant bg-surface-container p-3 space-y-2">
+                          <p className="font-label text-xs font-medium text-on-surface">
+                            🔍 Debug Artifacts — {tc.cluster_artifacts.cluster_name}
+                          </p>
+
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                            {tc.cluster_artifacts.azure_activity_log && (
+                              <a
+                                href={tc.cluster_artifacts.azure_activity_log}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:underline"
+                              >
+                                ☁️ Azure Activity Log
+                              </a>
+                            )}
+                            {tc.cluster_artifacts.pod_log_dirs?.map((dir) => (
+                              <span key={dir} className="text-on-surface-variant">
+                                📦 {dir}
+                              </span>
+                            ))}
+                          </div>
+
+                          {tc.cluster_artifacts.machines && tc.cluster_artifacts.machines.length > 0 && (
+                            <details className="group/machines">
+                              <summary className="cursor-pointer font-label text-xs text-on-surface-variant hover:text-on-surface transition-colors">
+                                🖥️ Machine Logs ({tc.cluster_artifacts.machines.length} machines)
+                              </summary>
+                              <div className="mt-2 space-y-2">
+                                {tc.cluster_artifacts.machines.map((m) => (
+                                  <div key={m.name} className="pl-4">
+                                    <p className="font-mono text-xs text-on-surface-variant">{m.name}</p>
+                                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                                      {Object.entries(m.logs).map(([logType, url]) => (
+                                        <a
+                                          key={logType}
+                                          href={url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="font-label text-[11px] text-primary hover:underline"
+                                        >
+                                          {logType}
+                                        </a>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </details>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </td>

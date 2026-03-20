@@ -40,6 +40,19 @@ export interface TestCase {
   failure_body?: string;
   failure_location?: string;
   failure_location_url?: string;
+  cluster_artifacts?: ClusterArtifacts;
+}
+
+export interface ClusterArtifacts {
+  cluster_name: string;
+  azure_activity_log?: string;
+  machines?: MachineArtifacts[];
+  pod_log_dirs?: string[];
+}
+
+export interface MachineArtifacts {
+  name: string;
+  logs: Record<string, string>;
 }
 
 export interface BuildResult {

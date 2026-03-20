@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/willie-yao/capz-prow-dashboard/backend/internal/aggregator"
+	"github.com/willie-yao/capz-prow-dashboard/backend/internal/artifacts"
 	"github.com/willie-yao/capz-prow-dashboard/backend/internal/config"
 	"github.com/willie-yao/capz-prow-dashboard/backend/internal/gcs"
 	"github.com/willie-yao/capz-prow-dashboard/backend/internal/gcsweb"
@@ -186,6 +187,21 @@ func fetchBuildResult(ctx context.Context, client *http.Client, jobName, buildID
 			result.TestsFailed++
 		case "skipped":
 			result.TestsSkipped++
+		}
+	}
+
+	// For failed builds, discover per-cluster debug artifacts.
+	if !result.Passed && result.TestsFailed > 0 {
+		clusters, err := artifacts.DiscoverClusters(ctx, client, jobName, buildID)
+		if err != nil {
+			log.Printf("    ⚠ %s/%s: artifact discovery failed: %v", jobName, buildID, err)
+		} else if len(clusters) > 0 {
+			for i := range result.TestCases {
+				if result.TestCases[i].Status != "failed" {
+					continue
+				}
+				result.TestCases[i].ClusterArtifacts = artifacts.MapTestToCluster(result.TestCases[i].Name, clusters)
+			}
 		}
 	}
 
