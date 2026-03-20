@@ -1,9 +1,11 @@
-import { useState } from "react";
+import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import type { TestCase } from "../types/dashboard";
 import { formatDuration } from "../lib/utils";
 
 interface TestCaseTableProps {
   testCases: TestCase[];
+  jobName?: string;
 }
 
 const statusOrder: Record<string, number> = {
@@ -29,8 +31,8 @@ const setupPatterns = /synchronizedbeforesuite|synchronizedaftersuite|beforesuit
 // Highlight Go file:line references in stack traces
 const goFileLineRe = /([a-zA-Z0-9_/.\-@]+\.go:\d+)/g;
 
-function highlightStackTrace(body: string): (string | JSX.Element)[] {
-  const parts: (string | JSX.Element)[] = [];
+function highlightStackTrace(body: string): (string | React.ReactElement)[] {
+  const parts: (string | React.ReactElement)[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
   let key = 0;
@@ -52,7 +54,7 @@ function highlightStackTrace(body: string): (string | JSX.Element)[] {
   return parts;
 }
 
-export function TestCaseTable({ testCases }: TestCaseTableProps) {
+export function TestCaseTable({ testCases, jobName }: TestCaseTableProps) {
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
 
   const filtered = testCases.filter(
@@ -116,7 +118,17 @@ export function TestCaseTable({ testCases }: TestCaseTableProps) {
                       {statusIcon(tc.status)}
                     </span>
                     <span className="min-w-0 flex-1 truncate px-3 py-2 text-on-surface">
-                      {tc.name}
+                      {jobName && tc.status === "failed" ? (
+                        <Link
+                          to={`/job/${encodeURIComponent(jobName)}/test/${encodeURIComponent(tc.name)}`}
+                          className="hover:text-primary transition-colors"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {tc.name}
+                        </Link>
+                      ) : (
+                        tc.name
+                      )}
                       {tc.failure_location_url && (
                         <a
                           href={tc.failure_location_url}

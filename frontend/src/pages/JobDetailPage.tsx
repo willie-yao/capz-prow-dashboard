@@ -240,7 +240,7 @@ export function JobDetailPage() {
               <h2 className="font-headline mb-3 text-lg font-semibold text-on-surface">
                 Test Cases
               </h2>
-              <TestCaseTable testCases={testCases} />
+              <TestCaseTable testCases={testCases} jobName={jobName} />
             </section>
           )}
 
