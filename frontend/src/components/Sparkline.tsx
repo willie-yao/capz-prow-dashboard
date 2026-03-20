@@ -13,7 +13,7 @@ export function Sparkline({ runs, jobName }: SparklineProps) {
   const recent = runs.slice(-15);
 
   return (
-    <div className="relative flex items-center gap-1">
+    <div className="relative flex items-center gap-1.5">
       {recent.map((run, i) => (
         <Link
           key={run.build_id}
@@ -23,7 +23,7 @@ export function Sparkline({ runs, jobName }: SparklineProps) {
           onMouseLeave={() => setHoveredIdx(null)}
         >
           <span
-            className={`block h-2 w-2 rounded-full transition-transform group-hover:scale-150 ${dotColor(run.passed)}`}
+            className={`block h-2 w-2 rounded-full transition-transform group-hover:scale-125 ${dotColor(run.passed)}`}
           />
           {hoveredIdx === i && (
             <span className="absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-surface-container-highest px-2 py-1 font-label text-[10px] text-on-surface shadow-lg">

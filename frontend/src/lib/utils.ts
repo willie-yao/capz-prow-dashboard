@@ -75,11 +75,11 @@ export function groupByBranch(
 }
 
 export const categoryLabels: Record<string, string> = {
-  conformance: "Conformance",
-  "capi-e2e": "CAPI E2E",
   "capz-e2e": "CAPZ E2E",
   "aks-e2e": "AKS E2E",
   upgrade: "Upgrade",
+  "capi-e2e": "CAPI E2E",
+  conformance: "Conformance",
   coverage: "Coverage",
   scalability: "Scalability",
   other: "Other",

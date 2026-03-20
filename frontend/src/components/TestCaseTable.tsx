@@ -23,10 +23,17 @@ function statusIcon(status: string) {
   }
 }
 
+// Hide Ginkgo setup/teardown entries unless they failed.
+const setupPatterns = /synchronizedbeforesuite|synchronizedaftersuite|beforesuite|aftersuite/i;
+
 export function TestCaseTable({ testCases }: TestCaseTableProps) {
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
 
-  const sorted = [...testCases].sort(
+  const filtered = testCases.filter(
+    (tc) => tc.status !== "skipped" && (tc.status === "failed" || !setupPatterns.test(tc.name))
+  );
+
+  const sorted = [...filtered].sort(
     (a, b) => (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3)
   );
 

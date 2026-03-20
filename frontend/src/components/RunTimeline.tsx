@@ -24,7 +24,7 @@ export function RunTimeline({
 
   return (
     <div className="overflow-x-auto">
-      <div className="flex items-end gap-1 pb-5">
+      <div className="flex items-start gap-1 p-1">
         {sorted.map((run, i) => {
           const isSelected = run.build_id === selectedBuildId;
           const showDate = i % 5 === 0 || i === sorted.length - 1;
@@ -41,13 +41,9 @@ export function RunTimeline({
                 }`}
                 title={`#${run.build_id} — ${run.passed ? "passed" : "failed"}`}
               />
-              {showDate ? (
-                <span className="mt-1.5 font-label text-[9px] text-on-surface-variant">
-                  {shortDate(run.started)}
-                </span>
-              ) : (
-                <span className="mt-1.5 h-3" />
-              )}
+              <span className={`mt-1.5 font-label text-[9px] ${showDate ? "text-on-surface-variant" : "invisible"}`}>
+                {shortDate(run.started)}
+              </span>
             </div>
           );
         })}

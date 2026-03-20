@@ -1,10 +1,10 @@
-import { Outlet } from "react-router-dom";
+import { Link, Outlet } from "react-router-dom";
 
 export function Layout() {
   return (
     <div className="min-h-screen bg-background text-on-background">
       <header className="glass sticky top-0 z-50 h-16 flex items-center border-b border-outline-variant px-6">
-        <div className="flex items-center gap-3">
+        <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <svg
             className="h-5 w-5 text-primary"
             viewBox="0 0 24 24"
@@ -21,7 +21,7 @@ export function Layout() {
           <h1 className="font-headline text-lg font-semibold tracking-tight text-on-surface">
             CAPZ Prow Dashboard
           </h1>
-        </div>
+        </Link>
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-6">
