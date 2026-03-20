@@ -152,9 +152,15 @@ export function JobDetailPage() {
                 <h3 className="font-headline text-base font-semibold text-on-surface">
                   Run Details
                 </h3>
-                <span
-                  className={`inline-block h-2.5 w-2.5 rounded-full ${statusBg(selectedRun.passed ? "PASSING" : "FAILING")}`}
-                />
+                {selectedRun.result === "PENDING" ? (
+                  <span className="rounded-full bg-primary/20 px-2.5 py-0.5 font-label text-xs font-medium text-primary">
+                    In Progress
+                  </span>
+                ) : (
+                  <span
+                    className={`inline-block h-2.5 w-2.5 rounded-full ${statusBg(selectedRun.passed ? "PASSING" : "FAILING")}`}
+                  />
+                )}
               </div>
 
               <div className="grid grid-cols-1 gap-x-8 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
@@ -177,7 +183,9 @@ export function JobDetailPage() {
                     Finished
                   </span>
                   <p className="text-on-surface">
-                    {new Date(selectedRun.finished).toLocaleString()}
+                    {selectedRun.result === "PENDING"
+                      ? "Still running…"
+                      : new Date(selectedRun.finished).toLocaleString()}
                   </p>
                 </div>
                 <div>
@@ -185,7 +193,9 @@ export function JobDetailPage() {
                     Duration
                   </span>
                   <p className="text-on-surface">
-                    {formatDuration(selectedRun.duration_seconds)}
+                    {selectedRun.result === "PENDING"
+                      ? "—"
+                      : formatDuration(selectedRun.duration_seconds)}
                   </p>
                 </div>
                 <div>
@@ -231,6 +241,16 @@ export function JobDetailPage() {
                 Test Cases
               </h2>
               <TestCaseTable testCases={testCases} />
+            </section>
+          )}
+
+          {selectedRun && testCases.length === 0 && (
+            <section className="glass rounded-xl p-8 text-center">
+              <p className="text-on-surface-variant">
+                {selectedRun.result === "PENDING"
+                  ? "⏳ This build is still running — test results will appear when it completes."
+                  : "No test cases available for this run."}
+              </p>
             </section>
           )}
         </>
