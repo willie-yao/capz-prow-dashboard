@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useJobDetail } from "../hooks/useData";
 import { formatDuration, timeAgo } from "../lib/utils";
+import { DurationChart } from "../components/DurationChart";
 import type { BuildResult, TestCase } from "../types/dashboard";
 
 /** Strip numbers and hex strings to normalize error messages for grouping. */
@@ -326,6 +327,28 @@ export function TestDetailPage() {
           </div>
         </div>
       </section>
+
+      {/* Duration trend chart */}
+      {(() => {
+        const durationHistory = occurrences
+          .filter((o) => o.testCase)
+          .map((o) => ({
+            build_id: o.run.build_id,
+            timestamp: o.run.started,
+            duration: o.testCase!.duration_seconds,
+            passed: o.testCase!.status === "passed",
+          }));
+        return durationHistory.length > 0 ? (
+          <section>
+            <h2 className="font-headline mb-3 text-lg font-semibold text-on-surface">
+              Duration Trend
+            </h2>
+            <div className="glass rounded-xl p-4">
+              <DurationChart history={durationHistory} />
+            </div>
+          </section>
+        ) : null;
+      })()}
 
       {/* Failure pattern grouping */}
       {failureGroups.length > 0 && (

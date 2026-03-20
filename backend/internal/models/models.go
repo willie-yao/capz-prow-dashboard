@@ -110,3 +110,52 @@ const (
 	ClassificationFlaky      FailureClassification = "flaky"
 	ClassificationOneOff     FailureClassification = "one-off"
 )
+
+// TestFlakiness represents flakiness statistics for a single test across all runs of a job.
+type TestFlakiness struct {
+	TestName            string                `json:"test_name"`
+	JobName             string                `json:"job_name"`
+	TotalRuns           int                   `json:"total_runs"`
+	Failures            int                   `json:"failures"`
+	Passes              int                   `json:"passes"`
+	FlipRate            float64               `json:"flip_rate"`
+	FailRate            float64               `json:"fail_rate"`
+	ConsecutiveFailures int                   `json:"consecutive_failures"`
+	Classification      FailureClassification `json:"classification"`
+	LastFailure         *TestFailureInfo      `json:"last_failure,omitempty"`
+	FirstFailedAt       string                `json:"first_failed_at,omitempty"`
+	ErrorPatterns       []ErrorPattern        `json:"error_patterns,omitempty"`
+	DurationHistory     []DurationPoint       `json:"duration_history,omitempty"`
+}
+
+// TestFailureInfo captures the most recent failure details.
+type TestFailureInfo struct {
+	BuildID        string `json:"build_id"`
+	Timestamp      string `json:"timestamp"`
+	FailureMessage string `json:"failure_message"`
+	ErrorHash      string `json:"error_hash"`
+}
+
+// ErrorPattern groups similar failures.
+type ErrorPattern struct {
+	NormalizedMessage string `json:"normalized_message"`
+	ErrorHash         string `json:"error_hash"`
+	Count             int    `json:"count"`
+	ExampleMessage    string `json:"example_message"`
+}
+
+// DurationPoint is a single data point for duration trend charts.
+type DurationPoint struct {
+	BuildID   string  `json:"build_id"`
+	Timestamp string  `json:"timestamp"`
+	Duration  float64 `json:"duration"`
+	Passed    bool    `json:"passed"`
+}
+
+// FlakinessReport is the top-level structure for flakiness.json.
+type FlakinessReport struct {
+	GeneratedAt        string          `json:"generated_at"`
+	MostFlaky          []TestFlakiness `json:"most_flaky"`
+	PersistentFailures []TestFlakiness `json:"persistent_failures"`
+	RecentlyBroken     []TestFlakiness `json:"recently_broken"`
+}

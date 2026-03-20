@@ -76,6 +76,44 @@ export interface BuildResult {
   tests_skipped: number;
 }
 
+export interface TestFlakiness {
+  test_name: string;
+  job_name: string;
+  total_runs: number;
+  failures: number;
+  passes: number;
+  flip_rate: number;
+  fail_rate: number;
+  consecutive_failures: number;
+  classification: "persistent" | "flaky" | "one-off";
+  last_failure?: {
+    build_id: string;
+    timestamp: string;
+    failure_message: string;
+    error_hash: string;
+  };
+  first_failed_at?: string;
+  error_patterns?: {
+    normalized_message: string;
+    error_hash: string;
+    count: number;
+    example_message: string;
+  }[];
+  duration_history?: {
+    build_id: string;
+    timestamp: string;
+    duration: number;
+    passed: boolean;
+  }[];
+}
+
+export interface FlakinessReport {
+  generated_at: string;
+  most_flaky: TestFlakiness[];
+  persistent_failures: TestFlakiness[];
+  recently_broken: TestFlakiness[];
+}
+
 export interface JobDetail {
   name: string;
   runs: BuildResult[];

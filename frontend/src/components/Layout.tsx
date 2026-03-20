@@ -1,4 +1,4 @@
-import { Link, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 
 export function Layout() {
   return (
@@ -22,6 +22,20 @@ export function Layout() {
             CAPZ Prow Dashboard
           </h1>
         </Link>
+        <nav className="ml-8 flex items-center gap-4">
+          <NavLink
+            to="/flaky"
+            className={({ isActive }) =>
+              `font-label text-sm transition-colors ${
+                isActive
+                  ? "text-primary font-medium"
+                  : "text-on-surface-variant hover:text-on-surface"
+              }`
+            }
+          >
+            Flakiness
+          </NavLink>
+        </nav>
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-6">

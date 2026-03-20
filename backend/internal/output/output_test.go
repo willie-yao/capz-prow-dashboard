@@ -139,8 +139,11 @@ func TestWriteAll(t *testing.T) {
 		sampleJobDetail("job-alpha"),
 		sampleJobDetail("job-beta"),
 	}
+	flakiness := models.FlakinessReport{
+		GeneratedAt: "2025-01-15T12:00:00Z",
+	}
 
-	if err := WriteAll(dir, dash, details); err != nil {
+	if err := WriteAll(dir, dash, details, flakiness); err != nil {
 		t.Fatalf("WriteAll: %v", err)
 	}
 
@@ -154,5 +157,9 @@ func TestWriteAll(t *testing.T) {
 		if _, err := os.Stat(p); err != nil {
 			t.Errorf("job file %s missing", p)
 		}
+	}
+	// flakiness.json exists
+	if _, err := os.Stat(filepath.Join(dir, "flakiness.json")); err != nil {
+		t.Error("flakiness.json missing")
 	}
 }

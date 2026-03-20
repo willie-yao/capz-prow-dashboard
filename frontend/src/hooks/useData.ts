@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import type { Dashboard, JobDetail } from "../types/dashboard";
+import type { Dashboard, FlakinessReport, JobDetail } from "../types/dashboard";
 
 const DATA_BASE =
   import.meta.env.VITE_DATA_URL ?? `${import.meta.env.BASE_URL}data`;
@@ -11,6 +11,25 @@ export function useDashboard() {
 
   useEffect(() => {
     fetch(`${DATA_BASE}/dashboard.json`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then(setData)
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  return { data, loading, error };
+}
+
+export function useFlakinessReport() {
+  const [data, setData] = useState<FlakinessReport | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`${DATA_BASE}/flakiness.json`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();

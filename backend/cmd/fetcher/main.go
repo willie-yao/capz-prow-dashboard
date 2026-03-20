@@ -126,8 +126,20 @@ func run() error {
 		details = append(details, detail)
 	}
 
+	// Step 4: Compute flakiness report.
+	jobResultMap := make(map[string][]models.BuildResult, len(results))
+	for _, r := range results {
+		if r.job.Name == "" {
+			continue
+		}
+		jobResultMap[r.job.Name] = r.runs
+	}
+	flakinessReport := aggregator.ComputeFlakinessReport(jobResultMap, now)
+	log.Printf("Flakiness report: %d most flaky, %d persistent, %d recently broken",
+		len(flakinessReport.MostFlaky), len(flakinessReport.PersistentFailures), len(flakinessReport.RecentlyBroken))
+
 	log.Printf("Writing output to %s/ (%d jobs)", *outDir, len(dashboard.Jobs))
-	if err := output.WriteAll(*outDir, dashboard, details); err != nil {
+	if err := output.WriteAll(*outDir, dashboard, details, flakinessReport); err != nil {
 		return fmt.Errorf("writing output: %w", err)
 	}
 

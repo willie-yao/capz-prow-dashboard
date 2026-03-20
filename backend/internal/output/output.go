@@ -40,8 +40,14 @@ func WriteJobDetail(dir string, detail models.JobDetail) error {
 	return writeJSON(filepath.Join(dir, "jobs", name), detail)
 }
 
-// WriteAll writes dashboard.json and all job detail files. Returns the first error encountered.
-func WriteAll(dir string, dashboard models.Dashboard, details []models.JobDetail) error {
+// WriteFlakinessReport writes flakiness.json to dir.
+func WriteFlakinessReport(dir string, report models.FlakinessReport) error {
+	return writeJSON(filepath.Join(dir, "flakiness.json"), report)
+}
+
+// WriteAll writes dashboard.json, all job detail files, and flakiness.json.
+// Returns the first error encountered.
+func WriteAll(dir string, dashboard models.Dashboard, details []models.JobDetail, flakiness models.FlakinessReport) error {
 	if err := WriteDashboard(dir, dashboard); err != nil {
 		return err
 	}
@@ -49,6 +55,9 @@ func WriteAll(dir string, dashboard models.Dashboard, details []models.JobDetail
 		if err := WriteJobDetail(dir, d); err != nil {
 			return err
 		}
+	}
+	if err := WriteFlakinessReport(dir, flakiness); err != nil {
+		return err
 	}
 	return nil
 }
