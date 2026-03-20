@@ -2,3 +2,4 @@ node_modules
 dist
 public/data/dashboard.json
 public/data/jobs/
+public/data/flakiness.json
