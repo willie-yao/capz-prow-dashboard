@@ -34,7 +34,7 @@ export function RunTimeline({
               <button
                 type="button"
                 onClick={() => onSelect(run.build_id)}
-                className={`h-4 w-4 rounded-sm transition-all ${dotColor(run.passed)} ${
+                className={`h-4 w-4 rounded-sm transition-all ${dotColor(run.passed, run.result)} ${
                   isSelected
                     ? "ring-2 ring-primary ring-offset-1 ring-offset-surface"
                     : "hover:brightness-125"

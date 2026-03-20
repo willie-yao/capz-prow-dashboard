@@ -26,7 +26,8 @@ export function statusBg(status: string): string {
   }
 }
 
-export function dotColor(passed: boolean): string {
+export function dotColor(passed: boolean, result?: string): string {
+  if (result === "PENDING") return "bg-tertiary";
   return passed ? "bg-secondary" : "bg-error";
 }
 
