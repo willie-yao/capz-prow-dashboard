@@ -7,6 +7,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -191,16 +193,56 @@ func fetchBuildResult(ctx context.Context, client *http.Client, jobName, buildID
 	}
 
 	// For failed builds, discover per-cluster debug artifacts.
-	if !result.Passed && result.TestsFailed > 0 {
+	// Skip if the build is still pending (no finished.json yet).
+	if result.Result != "PENDING" && !result.Passed && result.TestsFailed > 0 {
 		clusters, err := artifacts.DiscoverClusters(ctx, client, jobName, buildID)
 		if err != nil {
-			log.Printf("    ⚠ %s/%s: artifact discovery failed: %v", jobName, buildID, err)
-		} else if len(clusters) > 0 {
-			for i := range result.TestCases {
-				if result.TestCases[i].Status != "failed" {
-					continue
+			// 404 is expected for jobs that don't produce cluster artifacts (e.g., AKS, conformance).
+			// Only log non-404 errors.
+			if !strings.Contains(err.Error(), "404") {
+				log.Printf("    ⚠ %s/%s: artifact discovery failed: %v", jobName, buildID, err)
+			}
+		}
+
+		// Fetch build log for namespace mapping (best-effort).
+		var namespaceMap map[string]string
+		buildLog, err := gcs.FetchRaw(ctx, client, info.BuildLogURL)
+		if err != nil {
+			log.Printf("    ⚠ %s/%s: failed to fetch build log for namespace mapping: %v", jobName, buildID, err)
+		} else {
+			namespaceMap = artifacts.ParseNamespaceMap(buildLog)
+			log.Printf("    📋 %s/%s: build log %d bytes, %d namespace mappings", jobName, buildID, len(buildLog), len(namespaceMap))
+		}
+
+		nsPrefixRe := regexp.MustCompile(`capz-e2e-[a-z0-9]+`)
+
+		for i := range result.TestCases {
+			if result.TestCases[i].Status != "failed" {
+				continue
+			}
+
+			ca := artifacts.MapTestToCluster(result.TestCases[i].Name, clusters)
+			if ca != nil {
+				// Add bootstrap resources URL by extracting namespace prefix.
+				if prefix := nsPrefixRe.FindString(ca.ClusterName); prefix != "" {
+					ca.BootstrapResourcesURL = fmt.Sprintf(
+						"https://gcsweb.k8s.io/gcs/kubernetes-ci-logs/logs/%s/%s/artifacts/clusters/bootstrap/resources/%s/",
+						jobName, buildID, prefix,
+					)
 				}
-				result.TestCases[i].ClusterArtifacts = artifacts.MapTestToCluster(result.TestCases[i].Name, clusters)
+				result.TestCases[i].ClusterArtifacts = ca
+			} else if namespaceMap != nil {
+				// No workload cluster match — try namespace from build log.
+				ns := artifacts.FindNamespaceForTest(result.TestCases[i].Name, namespaceMap)
+				if ns != "" {
+					result.TestCases[i].ClusterArtifacts = &models.ClusterArtifacts{
+						ClusterName: ns,
+						BootstrapResourcesURL: fmt.Sprintf(
+							"https://gcsweb.k8s.io/gcs/kubernetes-ci-logs/logs/%s/%s/artifacts/clusters/bootstrap/resources/%s/",
+							jobName, buildID, ns,
+						),
+					}
+				}
 			}
 		}
 	}

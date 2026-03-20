@@ -1,6 +1,6 @@
 # CAPZ Prow Dashboard
 
-A modern dashboard for [Cluster API Provider Azure (CAPZ)](https://github.com/kubernetes-sigs/cluster-api-provider-azure) prow E2E test results. Replaces the outdated [TestGrid UI](https://testgrid.k8s.io/sig-cluster-lifecycle-cluster-api-provider-azure) with a purpose-built frontend that makes it easy to triage test health, investigate failures, and track flakiness.
+A modern dashboard for [Cluster API Provider Azure (CAPZ)](https://github.com/kubernetes-sigs/cluster-api-provider-azure) prow E2E test results. Provides an alternative to the [TestGrid UI](https://testgrid.k8s.io/sig-cluster-lifecycle-cluster-api-provider-azure) with a purpose-built frontend that makes it easy to triage test health, investigate failures, and track flakiness.
 
 ## Features
 
@@ -8,7 +8,7 @@ A modern dashboard for [Cluster API Provider Azure (CAPZ)](https://github.com/ku
 - **Job Detail Page** — Run history timeline with clickable squares, test case table with failures sorted to top and expandable error messages
 - **Failure Investigation** — Failure messages, stack traces, and direct links to GitHub source locations
 - **Auto-Discovery** — Job configs are fetched from the [kubernetes/test-infra](https://github.com/kubernetes/test-infra/tree/master/config/jobs/kubernetes-sigs/cluster-api-provider-azure) repo via GitHub API, so new release branches are picked up automatically
-- **Links to Prow & GCS** — Every run links to Prow Spyglass and raw build logs
+- **Links to Prow & GCS** — Every run links to Prow artifacts and raw build logs
 
 ## Architecture
 

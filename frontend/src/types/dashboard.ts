@@ -47,7 +47,8 @@ export interface ClusterArtifacts {
   cluster_name: string;
   azure_activity_log?: string;
   machines?: MachineArtifacts[];
-  pod_log_dirs?: string[];
+  pod_log_dirs?: Record<string, string>;
+  bootstrap_resources_url?: string;
 }
 
 export interface MachineArtifacts {

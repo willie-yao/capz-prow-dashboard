@@ -105,7 +105,7 @@ export function DashboardPage() {
       </div>
 
       {/* Summary bar */}
-      <SummaryBar jobs={data.jobs} />
+      <SummaryBar jobs={data.jobs} onFilterClick={(s) => setStatusFilter(s as StatusFilter)} activeFilter={statusFilter} />
 
       {/* Filters */}
       <div className="flex flex-wrap gap-6">

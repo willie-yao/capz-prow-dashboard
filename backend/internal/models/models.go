@@ -45,10 +45,11 @@ type TestCase struct {
 
 // ClusterArtifacts holds links to debug artifacts for a specific cluster.
 type ClusterArtifacts struct {
-	ClusterName      string             `json:"cluster_name"`
-	AzureActivityLog string             `json:"azure_activity_log,omitempty"`
-	Machines         []MachineArtifacts `json:"machines,omitempty"`
-	PodLogDirs       []string           `json:"pod_log_dirs,omitempty"`
+	ClusterName           string             `json:"cluster_name"`
+	AzureActivityLog      string             `json:"azure_activity_log,omitempty"`
+	Machines              []MachineArtifacts `json:"machines,omitempty"`
+	PodLogDirs            map[string]string  `json:"pod_log_dirs,omitempty"` // name → GCSweb URL
+	BootstrapResourcesURL string             `json:"bootstrap_resources_url,omitempty"`
 }
 
 // MachineArtifacts holds links to per-machine debug logs.

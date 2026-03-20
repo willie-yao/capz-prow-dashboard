@@ -259,7 +259,7 @@ export function TestDetailPage() {
                   : "bg-on-surface-variant/20 text-on-surface-variant"
             }`}
           >
-            {latestStatus}
+            {latestStatus.charAt(0).toUpperCase() + latestStatus.slice(1)}
           </span>
           {classification && (
             <span
@@ -435,9 +435,9 @@ export function TestDetailPage() {
 
           {/* Full stack trace */}
           {selectedTc.failure_body && (
-            <details>
+            <details className="group/trace [&>summary]:list-none [&>summary::-webkit-details-marker]:hidden">
               <summary className="cursor-pointer font-label text-xs text-on-surface-variant transition-colors hover:text-on-surface">
-                ▶ Stack Trace
+                <span className="inline-block transition-transform group-open/trace:rotate-90">▶</span> Stack Trace
               </summary>
               <pre className="mt-2 whitespace-pre-wrap font-label text-xs leading-relaxed text-on-surface-variant">
                 {highlightStackTrace(selectedTc.failure_body)}
@@ -485,18 +485,34 @@ export function TestDetailPage() {
                     ☁️ Azure Activity Log
                   </a>
                 )}
-                {selectedTc.cluster_artifacts.pod_log_dirs?.map((dir) => (
-                  <span key={dir} className="text-on-surface-variant">
+                {selectedTc.cluster_artifacts.bootstrap_resources_url && (
+                  <a
+                    href={selectedTc.cluster_artifacts.bootstrap_resources_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    📋 Cluster Resources
+                  </a>
+                )}
+                {selectedTc.cluster_artifacts.pod_log_dirs && Object.entries(selectedTc.cluster_artifacts.pod_log_dirs).map(([dir, url]) => (
+                  <a
+                    key={dir}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
                     📦 {dir}
-                  </span>
+                  </a>
                 ))}
               </div>
 
               {selectedTc.cluster_artifacts.machines &&
                 selectedTc.cluster_artifacts.machines.length > 0 && (
-                  <details>
+                  <details className="group/machines [&>summary]:list-none [&>summary::-webkit-details-marker]:hidden">
                     <summary className="cursor-pointer font-label text-xs text-on-surface-variant transition-colors hover:text-on-surface">
-                      🖥️ Machine Logs (
+                      <span className="inline-block transition-transform group-open/machines:rotate-90">▶</span> 🖥️ Machine Logs (
                       {selectedTc.cluster_artifacts.machines.length} machines)
                     </summary>
                     <div className="mt-2 space-y-2">

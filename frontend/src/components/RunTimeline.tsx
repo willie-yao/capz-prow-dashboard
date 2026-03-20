@@ -39,7 +39,7 @@ export function RunTimeline({
                     ? "ring-2 ring-primary ring-offset-1 ring-offset-surface"
                     : "hover:brightness-125"
                 }`}
-                title={`#${run.build_id} — ${run.passed ? "passed" : "failed"}`}
+                title={`#${run.build_id} — ${run.passed ? "Passed" : "Failed"}`}
               />
               <span className={`mt-1.5 font-label text-[9px] ${showDate ? "text-on-surface-variant" : "invisible"}`}>
                 {shortDate(run.started)}
