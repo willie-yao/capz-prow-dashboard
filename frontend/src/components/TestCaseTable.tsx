@@ -26,6 +26,32 @@ function statusIcon(status: string) {
 // Hide Ginkgo setup/teardown entries unless they failed.
 const setupPatterns = /synchronizedbeforesuite|synchronizedaftersuite|beforesuite|aftersuite/i;
 
+// Highlight Go file:line references in stack traces
+const goFileLineRe = /([a-zA-Z0-9_/.\-@]+\.go:\d+)/g;
+
+function highlightStackTrace(body: string): (string | JSX.Element)[] {
+  const parts: (string | JSX.Element)[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+
+  while ((match = goFileLineRe.exec(body)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(body.slice(lastIndex, match.index));
+    }
+    parts.push(
+      <span key={key++} className="text-primary">
+        {match[1]}
+      </span>
+    );
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < body.length) {
+    parts.push(body.slice(lastIndex));
+  }
+  return parts;
+}
+
 export function TestCaseTable({ testCases }: TestCaseTableProps) {
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
 
@@ -122,10 +148,44 @@ export function TestCaseTable({ testCases }: TestCaseTableProps) {
                   </div>
 
                   {hasFail && isExpanded && (
-                    <div className="border-t border-outline-variant bg-error/5 px-6 py-3">
+                    <div className="border-t border-outline-variant bg-error/5 px-6 py-4 space-y-3">
+                      {/* Failure message */}
                       <pre className="whitespace-pre-wrap font-label text-xs leading-relaxed text-error">
                         {tc.failure_message}
                       </pre>
+
+                      {/* Full stack trace */}
+                      {tc.failure_body && (
+                        <details className="group/trace">
+                          <summary className="cursor-pointer font-label text-xs text-on-surface-variant hover:text-on-surface transition-colors">
+                            ▶ Stack Trace
+                          </summary>
+                          <pre className="mt-2 whitespace-pre-wrap font-label text-xs leading-relaxed text-on-surface-variant">
+                            {highlightStackTrace(tc.failure_body)}
+                          </pre>
+                        </details>
+                      )}
+
+                      {/* Source location link */}
+                      {tc.failure_location && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-on-surface-variant">📍</span>
+                          {tc.failure_location_url ? (
+                            <a
+                              href={tc.failure_location_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-mono text-primary hover:underline"
+                            >
+                              {tc.failure_location}
+                            </a>
+                          ) : (
+                            <span className="font-mono text-on-surface-variant">
+                              {tc.failure_location}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </td>
