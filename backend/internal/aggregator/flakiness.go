@@ -30,6 +30,10 @@ func ComputeTestFlakiness(testName string, jobName string, runs []models.BuildRe
 	for _, r := range runs {
 		for _, tc := range r.TestCases {
 			if tc.Name == testName {
+				// Skip tests that were skipped — they're not pass or fail.
+				if tc.Status == "skipped" {
+					break
+				}
 				outcomes = append(outcomes, testOutcome{
 					passed:  tc.Status == "passed",
 					message: tc.FailureMessage,
@@ -168,18 +172,24 @@ func ComputeFlakinessReport(jobResults map[string][]models.BuildResult, now time
 	}
 
 	report := models.FlakinessReport{
-		GeneratedAt: now.UTC().Format(time.RFC3339),
+		GeneratedAt:        now.UTC().Format(time.RFC3339),
+		MostFlaky:          []models.TestFlakiness{},
+		PersistentFailures: []models.TestFlakiness{},
+		RecentlyBroken:     []models.TestFlakiness{},
 	}
 
-	// MostFlaky: sort by flip_rate desc, cap at maxFlakyResults.
-	mostFlaky := make([]models.TestFlakiness, len(allFlaky))
-	copy(mostFlaky, allFlaky)
+	// MostFlaky: only tests classified as "flaky", sorted by flip_rate desc.
+	var mostFlaky []models.TestFlakiness
+	for _, tf := range allFlaky {
+		if tf.Classification == models.ClassificationFlaky {
+			mostFlaky = append(mostFlaky, tf)
+		}
+	}
 	sort.Slice(mostFlaky, func(i, j int) bool {
 		if mostFlaky[i].FlipRate != mostFlaky[j].FlipRate {
 			return mostFlaky[i].FlipRate > mostFlaky[j].FlipRate
 		}
-		// Tie-break by test name for determinism.
-		return mostFlaky[i].TestName < mostFlaky[j].TestName
+		return mostFlaky[i].FailRate > mostFlaky[j].FailRate
 	})
 	if len(mostFlaky) > maxFlakyResults {
 		mostFlaky = mostFlaky[:maxFlakyResults]

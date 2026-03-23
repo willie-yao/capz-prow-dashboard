@@ -141,6 +141,9 @@ func ClassifyFailure(testName string, runs []models.BuildResult, threshold int) 
 	for _, r := range runs {
 		for _, tc := range r.TestCases {
 			if tc.Name == testName {
+				if tc.Status == "skipped" {
+					break
+				}
 				outcomes = append(outcomes, testOutcome{
 					failed:  tc.Status == "failed",
 					message: tc.FailureMessage,

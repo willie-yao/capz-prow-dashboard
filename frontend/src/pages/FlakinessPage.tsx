@@ -238,7 +238,7 @@ export function FlakinessPage() {
     recently_broken: data.recently_broken,
   };
 
-  const items = listMap[activeTab];
+  const items = listMap[activeTab] ?? [];
 
   return (
     <div className="space-y-8">

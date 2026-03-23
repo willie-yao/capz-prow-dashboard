@@ -388,12 +388,14 @@ func TestComputeFlakinessReport_MultipleJobs(t *testing.T) {
 	now := flakyBaseTime
 	jobResults := map[string][]models.BuildResult{
 		"job1": {
-			makeFlakyBuild("2", flakyHoursAgo(1), false, []models.TestCase{makeTC("TestX", "failed", 1.0, "err")}),
-			makeFlakyBuild("1", flakyHoursAgo(2), true, []models.TestCase{makeTC("TestX", "passed", 1.0, "")}),
+			makeFlakyBuild("3", flakyHoursAgo(1), false, []models.TestCase{makeTC("TestX", "failed", 1.0, "err")}),
+			makeFlakyBuild("2", flakyHoursAgo(2), true, []models.TestCase{makeTC("TestX", "passed", 1.0, "")}),
+			makeFlakyBuild("1", flakyHoursAgo(3), false, []models.TestCase{makeTC("TestX", "failed", 1.0, "err")}),
 		},
 		"job2": {
-			makeFlakyBuild("2", flakyHoursAgo(1), false, []models.TestCase{makeTC("TestY", "failed", 1.0, "err")}),
-			makeFlakyBuild("1", flakyHoursAgo(2), true, []models.TestCase{makeTC("TestY", "passed", 1.0, "")}),
+			makeFlakyBuild("3", flakyHoursAgo(1), false, []models.TestCase{makeTC("TestY", "failed", 1.0, "err")}),
+			makeFlakyBuild("2", flakyHoursAgo(2), true, []models.TestCase{makeTC("TestY", "passed", 1.0, "")}),
+			makeFlakyBuild("1", flakyHoursAgo(3), false, []models.TestCase{makeTC("TestY", "failed", 1.0, "err")}),
 		},
 	}
 

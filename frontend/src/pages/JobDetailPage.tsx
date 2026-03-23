@@ -16,25 +16,27 @@ export function JobDetailPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { data, loading, error } = useJobDetail(jobName);
 
+  const runs = data?.runs ?? [];
+
   const selectedBuildId =
-    searchParams.get("run") ?? data?.runs[0]?.build_id ?? undefined;
+    searchParams.get("run") ?? runs[0]?.build_id ?? undefined;
 
   const selectedRun: BuildResult | undefined = useMemo(() => {
-    if (!data || !selectedBuildId) return undefined;
-    return data.runs.find((r) => r.build_id === selectedBuildId);
-  }, [data, selectedBuildId]);
+    if (!selectedBuildId) return undefined;
+    return runs.find((r) => r.build_id === selectedBuildId);
+  }, [runs, selectedBuildId]);
 
   const testCases: TestCase[] = selectedRun?.test_cases ?? [];
 
   const passRate7d = useMemo(() => {
-    if (!data || data.runs.length === 0) return null;
+    if (runs.length === 0) return null;
     const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const recent = data.runs.filter(
+    const recent = runs.filter(
       (r) => new Date(r.started).getTime() >= cutoff
     );
     if (recent.length === 0) return null;
     return recent.filter((r) => r.passed).length / recent.length;
-  }, [data]);
+  }, [runs]);
 
   function handleSelectRun(buildId: string) {
     setSearchParams({ run: buildId });
@@ -84,7 +86,7 @@ export function JobDetailPage() {
 
   if (!data) return null;
 
-  const lastRun = data.runs[0] ?? null;
+  const lastRun = runs[0] ?? null;
 
   return (
     <div className="space-y-8">
@@ -117,7 +119,7 @@ export function JobDetailPage() {
             </span>
           )}
           <span className="text-sm text-on-surface-variant">
-            {data.runs.length} total run{data.runs.length !== 1 && "s"}
+            {runs.length} total run{runs.length !== 1 && "s"}
           </span>
           {lastRun && (
             <span className="text-sm text-on-surface-variant">
@@ -128,7 +130,7 @@ export function JobDetailPage() {
       </div>
 
       {/* Run timeline */}
-      {data.runs.length === 0 ? (
+      {runs.length === 0 ? (
         <div className="glass rounded-xl p-8 text-center">
           <p className="text-on-surface-variant">No runs found</p>
         </div>
@@ -139,7 +141,7 @@ export function JobDetailPage() {
               Run History
             </h2>
             <RunTimeline
-              runs={data.runs}
+              runs={runs}
               selectedBuildId={selectedBuildId}
               onSelect={handleSelectRun}
             />

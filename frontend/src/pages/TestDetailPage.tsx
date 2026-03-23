@@ -64,12 +64,12 @@ export function TestDetailPage() {
   // Build per-run test occurrences (oldest first for timeline)
   const occurrences: TestOccurrence[] = useMemo(() => {
     if (!data) return [];
-    const sorted = [...data.runs].sort(
+    const sorted = [...(data.runs ?? [])].sort(
       (a, b) => new Date(a.started).getTime() - new Date(b.started).getTime()
     );
     return sorted.map((run) => {
       const tc =
-        run.test_cases.find((t) => t.name === testName) ?? null;
+        (run.test_cases ?? []).find((t) => t.name === testName) ?? null;
       return { run, testCase: tc };
     });
   }, [data, testName]);
