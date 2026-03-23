@@ -97,6 +97,18 @@ export function formatSteps(text: string): string {
   return result;
 }
 
+/** Strip common verbose prefixes from test names for compact display. */
+export function shortTestName(name: string): string {
+  let short = name
+    .replace(/^\[It\]\s+/, "")
+    .replace(/^Workload cluster creation\s+Creating\s+(a\s+)?/, "")
+    .replace(/^Running the Cluster API E2E tests\s+/, "CAPI: ")
+    .replace(/^Conformance Tests\s+/, "Conformance: ")
+    .replace(/^Running\s+/, "");
+  // Capitalize first letter
+  return short.charAt(0).toUpperCase() + short.slice(1);
+}
+
 const CAPZ_REPO = "https://github.com/kubernetes-sigs/cluster-api-provider-azure/blob/main/";
 
 /** Turn a file path from AI analysis into a URL if possible. */

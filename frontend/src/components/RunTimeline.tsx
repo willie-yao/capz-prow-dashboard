@@ -24,7 +24,7 @@ export function RunTimeline({
 
   return (
     <div className="overflow-x-auto">
-      <div className="flex items-start gap-1 p-1">
+      <div className="flex items-start gap-2 p-1">
         {sorted.map((run, i) => {
           const isSelected = run.build_id === selectedBuildId;
           const showDate = i % 5 === 0 || i === sorted.length - 1;
@@ -34,7 +34,7 @@ export function RunTimeline({
               <button
                 type="button"
                 onClick={() => onSelect(run.build_id)}
-                className={`h-4 w-4 rounded-sm transition-all ${dotColor(run.passed, run.result)} ${
+                className={`h-6 w-10 rounded-sm transition-all ${dotColor(run.passed, run.result)} ${
                   isSelected
                     ? "ring-2 ring-primary ring-offset-1 ring-offset-surface"
                     : "hover:brightness-125"

@@ -52,6 +52,10 @@
   --font-family-label: "Space Grotesk", sans-serif;
 }
 
+html {
+  font-size: 17px;
+}
+
 body {
   background-color: var(--color-background);
   color: var(--color-on-background);

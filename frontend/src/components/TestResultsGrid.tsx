@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import type { BuildResult } from "../types/dashboard";
+import { shortTestName } from "../lib/utils";
 
 interface TestResultsGridProps {
   runs: BuildResult[];
@@ -62,13 +63,8 @@ export function TestResultsGrid({ runs, jobName }: TestResultsGridProps) {
       const hasPass = cells.some((s) => s === "passed");
       const hasFail = failCount > 0;
 
-      // Filter out tests that passed in ALL runs
-      if (!hasFail) continue;
-
-      // Filter out skipped-only tests
+      // Filter out skipped-only tests and setup/teardown (unless failed)
       if (!hasPass && !hasFail) continue;
-
-      // Filter out setup/teardown unless they failed
       if (setupPatterns.test(testName) && !hasFail) continue;
 
       rows.push({ testName, failCount, cells });
@@ -96,72 +92,90 @@ export function TestResultsGrid({ runs, jobName }: TestResultsGridProps) {
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-outline-variant bg-surface">
-      <table className="border-collapse">
-        {/* Column headers: date labels */}
-        <thead>
-          <tr>
-            <th className="sticky left-0 z-10 bg-surface px-3 py-2" />
-            {sortedRuns.map((run) => (
-              <th
-                key={run.build_id}
-                className="px-0.5 py-2 font-label text-[10px] font-normal text-on-surface-variant"
-              >
-                {shortDate(run.started)}
-              </th>
-            ))}
-          </tr>
-        </thead>
-
-        <tbody>
-          {gridRows.map((row) => (
-            <tr key={row.testName} className="group hover:brightness-110">
-              {/* Sticky test name column */}
-              <td className="sticky left-0 z-10 border-r border-outline-variant bg-surface px-3 py-1 group-hover:brightness-110">
-                <Link
-                  to={`/job/${encodeURIComponent(jobName)}/test/${encodeURIComponent(row.testName)}`}
-                  className="block max-w-[260px] truncate text-xs text-on-surface transition-colors hover:text-primary"
-                  title={row.testName}
-                >
-                  {truncate(row.testName, 40)}
-                </Link>
-              </td>
-
-              {/* Status cells */}
-              {row.cells.map((status, colIdx) => {
-                const run = sortedRuns[colIdx];
-                const cellColor =
-                  status === "passed"
-                    ? "bg-secondary"
-                    : status === "failed"
-                      ? "bg-error"
-                      : "bg-on-surface-variant/30";
-
-                const cell = (
-                  <div
-                    className={`mx-auto h-3 w-3 rounded-[2px] ${cellColor}`}
-                    title={`${row.testName}\n#${run.build_id} — ${status}`}
-                  />
-                );
-
-                return (
-                  <td key={run.build_id} className="px-0.5 py-0.5">
-                    {status === "failed" ? (
-                      <Link
-                        to={`/job/${encodeURIComponent(jobName)}?run=${run.build_id}`}
-                      >
-                        {cell}
-                      </Link>
-                    ) : (
-                      cell
-                    )}
+    <div className="rounded-xl border border-outline-variant bg-surface">
+      <div className="flex">
+        {/* Test name column — fixed width, horizontally scrollable */}
+        <div className="w-[300px] shrink-0 overflow-x-auto border-r border-outline-variant">
+          <table className="border-collapse w-full">
+            <thead>
+              <tr className="h-8">
+                <th className="bg-surface px-3 text-left font-label text-[10px] font-normal text-on-surface-variant whitespace-nowrap">
+                  Test
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {gridRows.map((row) => (
+                <tr key={row.testName} className="h-7 group hover:brightness-110">
+                  <td className="bg-surface group-hover:brightness-110">
+                    <Link
+                      to={`/job/${encodeURIComponent(jobName)}/test/${encodeURIComponent(row.testName)}`}
+                      className="block whitespace-nowrap px-3 text-xs text-on-surface transition-colors hover:text-primary"
+                      title={row.testName}
+                    >
+                      {shortTestName(row.testName)}
+                    </Link>
                   </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Results grid — scrollable horizontally */}
+        <div className="overflow-x-auto">
+          <table className="border-collapse">
+            <thead>
+              <tr className="h-8">
+                {sortedRuns.map((run) => (
+                  <th
+                    key={run.build_id}
+                    className="px-1 font-label text-[10px] font-normal text-on-surface-variant"
+                  >
+                    {shortDate(run.started)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {gridRows.map((row) => (
+                <tr key={row.testName} className="h-7 group hover:brightness-110">
+                  {row.cells.map((status, colIdx) => {
+                    const run = sortedRuns[colIdx];
+                    const cellColor =
+                      status === "passed"
+                        ? "bg-secondary"
+                        : status === "failed"
+                          ? "bg-error"
+                          : "bg-on-surface-variant/30";
+
+                    const cell = (
+                      <div
+                        className={`mx-auto h-5 w-12 rounded-[2px] ${cellColor}`}
+                        title={`${shortTestName(row.testName)}\n#${run.build_id} — ${status}`}
+                      />
+                    );
+
+                    return (
+                      <td key={run.build_id} className="px-1 py-0.5">
+                        {status !== "absent" ? (
+                          <Link
+                            to={`/job/${encodeURIComponent(jobName)}?run=${run.build_id}`}
+                          >
+                            {cell}
+                          </Link>
+                        ) : (
+                          cell
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

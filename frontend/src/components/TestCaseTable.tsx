@@ -15,14 +15,16 @@ const statusOrder: Record<string, number> = {
   skipped: 2,
 };
 
+import { HiCheckCircle, HiXCircle, HiMinusCircle } from "react-icons/hi2";
+
 function statusIcon(status: string) {
   switch (status) {
     case "passed":
-      return <span className="text-secondary">✓</span>;
+      return <HiCheckCircle className="text-secondary text-lg" />;
     case "failed":
-      return <span className="text-error">✗</span>;
+      return <HiXCircle className="text-error text-lg" />;
     default:
-      return <span className="text-on-surface-variant">⊘</span>;
+      return <HiMinusCircle className="text-on-surface-variant text-lg" />;
   }
 }
 
@@ -162,7 +164,7 @@ export function TestCaseTable({ testCases, jobName, buildLogUrl }: TestCaseTable
 
                   {/* AI summary — shown inline for failed tests without expanding */}
                   {tc.ai_summary && (
-                    <div className={`flex items-start gap-2 px-6 py-1.5 ${stripe}`}>
+                    <div className={`flex items-start gap-2 pl-16 pr-6 py-1.5 ${stripe}`}>
                       <span className="text-xs">🤖</span>
                       <span className={`text-xs ${tc.ai_summary.is_transient ? "text-on-surface-variant" : "text-tertiary"}`}>
                         {tc.ai_summary.summary}

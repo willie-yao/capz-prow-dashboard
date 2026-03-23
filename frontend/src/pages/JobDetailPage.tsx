@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useJobDetail } from "../hooks/useData";
 import {
@@ -15,6 +15,7 @@ import { TestCaseTable } from "../components/TestCaseTable";
 export function JobDetailPage() {
   const { jobName } = useParams<{ jobName: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [gridOpen, setGridOpen] = useState(false);
   const { data, loading, error } = useJobDetail(jobName);
 
   const runs = data?.runs ?? [];
@@ -148,12 +149,25 @@ export function JobDetailPage() {
             />
           </section>
 
-          {/* Test results grid */}
+          {/* Test results grid — collapsible */}
           <section>
-            <h2 className="font-headline mb-3 text-lg font-semibold text-on-surface">
+            <button
+              type="button"
+              onClick={() => setGridOpen(!gridOpen)}
+              className="flex items-center gap-2 font-headline text-lg font-semibold text-on-surface hover:text-primary transition-colors"
+            >
+              <span className={`inline-block transition-transform duration-200 ${gridOpen ? "rotate-90" : ""}`}>▶</span>
               Test Results Grid
-            </h2>
-            <TestResultsGrid runs={runs} jobName={jobName!} />
+            </button>
+            <div
+              className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${gridOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
+            >
+              <div className="overflow-hidden">
+                <div className="pt-3">
+                  <TestResultsGrid runs={runs} jobName={jobName!} />
+                </div>
+              </div>
+            </div>
           </section>
 
           {/* Selected run details */}
