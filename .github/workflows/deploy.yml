@@ -36,18 +36,34 @@ jobs:
         working-directory: backend
         run: go build -o ../fetcher ./cmd/fetcher/
 
-      # Restore AI analysis cache so only new/changed failures are re-analyzed
+      # Restore AI analysis cache.
+      # On push: use commit SHA in key so cache is busted (fresh analysis).
+      # On schedule/manual: use static key to reuse cached analyses.
+      - name: Clear AI cache on push
+        if: github.event_name == 'push'
+        run: rm -f frontend/public/data/ai_cache.json
+
       - name: Restore AI cache
-        uses: actions/cache@v4
+        if: github.event_name != 'push'
+        uses: actions/cache/restore@v4
         with:
           path: frontend/public/data/ai_cache.json
-          key: ai-cache
+          key: ai-cache-${{ github.run_id }}
+          restore-keys: ai-cache-
 
       - name: Fetch test data
         env:
           AI_TOKEN: ${{ secrets.AI_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./fetcher -builds=8 -workers=5 -out=frontend/public/data -timeout=10m -ai
+
+      # Save AI cache for future cron runs
+      - name: Save AI cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: frontend/public/data/ai_cache.json
+          key: ai-cache-${{ github.run_id }}
 
       # --- React frontend ---
       - uses: actions/setup-node@v4
