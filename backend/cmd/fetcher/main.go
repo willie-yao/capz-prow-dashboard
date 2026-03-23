@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -72,6 +74,9 @@ func run() error {
 	log.Printf("Discovered %d jobs", len(jobs))
 
 	// Step 2: For each job, discover builds and fetch results.
+	// Load existing data to skip re-fetching completed builds.
+	cachedJobs := loadCachedJobDetails(*outDir)
+
 	type jobResult struct {
 		job  models.ProwJob
 		runs []models.BuildResult
@@ -90,7 +95,7 @@ func run() error {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			runs, err := fetchJobRuns(ctx, client, j.Name, *buildsPerJob)
+			runs, err := fetchJobRunsCached(ctx, client, j.Name, *buildsPerJob, cachedJobs[j.Name])
 			if err != nil {
 				mu.Lock()
 				fetchErrors = append(fetchErrors, fmt.Errorf("job %s: %w", j.Name, err))
@@ -161,6 +166,74 @@ func run() error {
 
 	log.Println("Done!")
 	return nil
+}
+
+// loadCachedJobDetails loads existing per-job JSON files from the output dir
+// and returns a map of job name → cached BuildResults (keyed by build ID).
+func loadCachedJobDetails(outDir string) map[string]map[string]models.BuildResult {
+	cached := make(map[string]map[string]models.BuildResult)
+	jobsDir := filepath.Join(outDir, "jobs")
+	entries, err := os.ReadDir(jobsDir)
+	if err != nil {
+		return cached
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(jobsDir, e.Name()))
+		if err != nil {
+			continue
+		}
+		var detail models.JobDetail
+		if json.Unmarshal(data, &detail) != nil || detail.Name == "" {
+			continue
+		}
+		builds := make(map[string]models.BuildResult, len(detail.Runs))
+		for _, r := range detail.Runs {
+			// Only cache completed builds (not PENDING).
+			if r.Result != "PENDING" && r.Result != "" {
+				builds[r.BuildID] = r
+			}
+		}
+		if len(builds) > 0 {
+			cached[detail.Name] = builds
+		}
+	}
+	return cached
+}
+
+// fetchJobRunsCached discovers recent builds and uses cached data for completed builds.
+func fetchJobRunsCached(ctx context.Context, client *http.Client, jobName string, count int, cachedBuilds map[string]models.BuildResult) ([]models.BuildResult, error) {
+	buildIDs, err := gcsweb.ListRecentBuildIDs(ctx, client, jobName, count)
+	if err != nil {
+		return nil, fmt.Errorf("listing builds: %w", err)
+	}
+
+	var runs []models.BuildResult
+	fetched, reused := 0, 0
+	for _, bid := range buildIDs {
+		// Use cached data for completed builds.
+		if cached, ok := cachedBuilds[bid]; ok {
+			runs = append(runs, cached)
+			reused++
+			continue
+		}
+
+		result, err := fetchBuildResult(ctx, client, jobName, bid)
+		if err != nil {
+			log.Printf("    ⚠ %s/%s: %v", jobName, bid, err)
+			continue
+		}
+		runs = append(runs, *result)
+		fetched++
+	}
+
+	if reused > 0 {
+		log.Printf("    💾 %s: %d cached, %d fetched", jobName, reused, fetched)
+	}
+
+	return runs, nil
 }
 
 // fetchJobRuns discovers recent builds for a job and fetches their results.
@@ -293,21 +366,13 @@ func analyzeFailuresWithAI(ctx context.Context, details []models.JobDetail, flak
 		consecutiveMap[tf.TestName] = tf.ConsecutiveFailures
 	}
 
-	var totalFailures, persistentCount int
+	var totalFailures, transientSkipped int
 	for _, d := range details {
-		if len(d.Runs) == 0 {
-			continue
-		}
-		latestRun := d.Runs[0]
-		for i := range latestRun.TestCases {
-			tc := &latestRun.TestCases[i]
-			if tc.Status != "failed" {
-				continue
-			}
-			totalFailures++
-			consec := consecutiveMap[tc.Name]
-			if consec >= 3 {
-				persistentCount++
+		for _, run := range d.Runs {
+			for _, tc := range run.TestCases {
+				if tc.Status == "failed" {
+					totalFailures++
+				}
 			}
 		}
 	}
@@ -316,45 +381,129 @@ func analyzeFailuresWithAI(ctx context.Context, details []models.JobDetail, flak
 		log.Println("🤖 No failures to analyze")
 		return
 	}
-	log.Printf("🤖 Analyzing %d failures (%d persistent)...", totalFailures, persistentCount)
+	log.Printf("🤖 Analyzing %d failures...", totalFailures)
+
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	flavorRe := regexp.MustCompile(`^capz-e2e-(.+?)-\d`)
 
 	for i := range details {
-		if len(details[i].Runs) == 0 {
-			continue
-		}
-		latestRun := &details[i].Runs[0]
-		for j := range latestRun.TestCases {
-			tc := &latestRun.TestCases[j]
-			if tc.Status != "failed" {
-				continue
-			}
+		for ri := range details[i].Runs {
+			run := &details[i].Runs[ri]
+			for j := range run.TestCases {
+				tc := &run.TestCases[j]
+				if tc.Status != "failed" {
+					continue
+				}
 
-			summary, err := aiClient.QuickSummary(ctx, tc.Name, tc.FailureMessage, tc.FailureLocation)
-			if err != nil {
-				log.Printf("  ⚠ AI summary failed for %s: %v", tc.Name, err)
-				continue
-			}
-			tc.AISummary = summary
+				// Check for known transient patterns first.
+				if reason := ai.IsKnownTransient(tc.FailureMessage); reason != "" {
+					tc.AISummary = &models.AISummary{
+						GeneratedAt: time.Now().UTC().Format(time.RFC3339),
+						Summary:     reason,
+						IsTransient: true,
+					}
+					transientSkipped++
+					log.Printf("  ⏭ Skipping transient: %s: %s", tc.Name, reason)
+					continue
+				}
 
-			consec := consecutiveMap[tc.Name]
-			if consec >= 3 {
-				var buildLogTail, activityExcerpt string
-				if latestRun.BuildLogURL != "" {
-					if logData, err := gcs.FetchRaw(ctx, &http.Client{Timeout: 30 * time.Second}, latestRun.BuildLogURL); err == nil {
+				// Quick summary for all non-transient failures.
+				summary, err := aiClient.QuickSummary(ctx, tc.Name, tc.FailureMessage, tc.FailureLocation)
+				if err != nil {
+					log.Printf("  ⚠ AI summary failed for %s: %v", tc.Name, err)
+					continue
+				}
+				tc.AISummary = summary
+
+				// Comprehensive analysis for all non-transient failures.
+				log.Printf("  🔍 Deep analyzing: %s", tc.Name)
+
+				var buildLogTail, activityExcerpt, bootLog, kubeletLog string
+
+				// Fetch build log tail (last 200 lines).
+				if run.BuildLogURL != "" {
+					if logData, err := gcs.FetchRaw(ctx, httpClient, run.BuildLogURL); err == nil {
 						lines := strings.Split(string(logData), "\n")
-						if len(lines) > 100 {
-							lines = lines[len(lines)-100:]
+						if len(lines) > 200 {
+							lines = lines[len(lines)-200:]
 						}
 						buildLogTail = strings.Join(lines, "\n")
 					}
 				}
+
+				// Fetch Azure activity log.
 				if tc.ClusterArtifacts != nil && tc.ClusterArtifacts.AzureActivityLog != "" {
-					if actData, err := gcs.FetchRaw(ctx, &http.Client{Timeout: 30 * time.Second}, tc.ClusterArtifacts.AzureActivityLog); err == nil {
+					if actData, err := gcs.FetchRaw(ctx, httpClient, tc.ClusterArtifacts.AzureActivityLog); err == nil {
 						activityExcerpt = string(actData)
 					}
 				}
 
-				analysis, err := aiClient.DeepAnalysis(ctx, tc.Name, consec, tc.FailureMessage, tc.FailureBody, buildLogTail, activityExcerpt)
+				// Fetch machine boot.log or cloud-init-output.log from first machine.
+				if tc.ClusterArtifacts != nil && len(tc.ClusterArtifacts.Machines) > 0 {
+					for _, m := range tc.ClusterArtifacts.Machines {
+						if bootLog != "" && kubeletLog != "" {
+							break
+						}
+						if bootLog == "" {
+							if url, ok := m.Logs["boot.log"]; ok && url != "" {
+								if data, err := gcs.FetchRaw(ctx, httpClient, url); err == nil {
+									lines := strings.Split(string(data), "\n")
+									if len(lines) > 200 {
+										lines = lines[len(lines)-200:]
+									}
+									bootLog = strings.Join(lines, "\n")
+								}
+							}
+							if bootLog == "" {
+								if url, ok := m.Logs["cloud-init-output.log"]; ok && url != "" {
+									if data, err := gcs.FetchRaw(ctx, httpClient, url); err == nil {
+										lines := strings.Split(string(data), "\n")
+										if len(lines) > 200 {
+											lines = lines[len(lines)-200:]
+										}
+										bootLog = strings.Join(lines, "\n")
+									}
+								}
+							}
+						}
+						if kubeletLog == "" {
+							if url, ok := m.Logs["kubelet.log"]; ok && url != "" {
+								if data, err := gcs.FetchRaw(ctx, httpClient, url); err == nil {
+									lines := strings.Split(string(data), "\n")
+									if len(lines) > 200 {
+										lines = lines[:200]
+									}
+									kubeletLog = strings.Join(lines, "\n")
+								}
+							}
+						}
+					}
+				}
+
+				// Determine cluster flavor from cluster name.
+				var flavor string
+				if tc.ClusterArtifacts != nil && tc.ClusterArtifacts.ClusterName != "" {
+					if m := flavorRe.FindStringSubmatch(tc.ClusterArtifacts.ClusterName); len(m) > 1 {
+						flavor = m[1]
+					}
+				}
+
+				consec := consecutiveMap[tc.Name]
+				if consec < 1 {
+					consec = 1
+				}
+
+				analysis, err := aiClient.ComprehensiveAnalysis(ctx, ai.AnalysisParams{
+					TestName:            tc.Name,
+					FailureMessage:      tc.FailureMessage,
+					FailureBody:         tc.FailureBody,
+					ConsecutiveFailures: consec,
+					BuildLogTail:        buildLogTail,
+					AzureActivityLog:    activityExcerpt,
+					MachineBootLog:      bootLog,
+					MachineKubeletLog:   kubeletLog,
+					ClusterFlavor:       flavor,
+				})
 				if err != nil {
 					log.Printf("  ⚠ AI deep analysis failed for %s: %v", tc.Name, err)
 					continue
@@ -363,5 +512,5 @@ func analyzeFailuresWithAI(ctx context.Context, details []models.JobDetail, flak
 			}
 		}
 	}
-	log.Println("🤖 AI analysis complete")
+	log.Printf("🤖 AI analysis complete (%d transient skipped)", transientSkipped)
 }

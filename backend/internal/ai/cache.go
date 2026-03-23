@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-const cacheMaxAge = 24 * time.Hour
+const cacheMaxAge = 30 * 24 * time.Hour
 
 // CacheEntry holds a single cached AI response.
 type CacheEntry struct {
@@ -40,7 +40,7 @@ func NewCache(dir string) *Cache {
 	return c
 }
 
-// Get returns the cached data if the key exists and is not expired.
+// Get returns the cached data if the key exists and is not older than 30 days.
 func (c *Cache) Get(key string) (json.RawMessage, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

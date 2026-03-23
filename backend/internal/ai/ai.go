@@ -51,6 +51,57 @@ func (c *Client) Cache() *Cache {
 	return c.cache
 }
 
+// ---------- Known transient detection ----------
+
+// transientPattern defines a local pattern for known transient failures.
+type transientPattern struct {
+	match  func(string) bool
+	reason string
+}
+
+var knownTransientPatterns = []transientPattern{
+	{
+		match:  func(s string) bool { return strings.Contains(s, "429") || strings.Contains(s, "throttling") || strings.Contains(s, "too many requests") },
+		reason: "Azure API throttling (HTTP 429)",
+	},
+	{
+		match:  func(s string) bool { return strings.Contains(s, "quota") && (strings.Contains(s, "exceeded") || strings.Contains(s, "limit")) },
+		reason: "Azure resource quota exceeded",
+	},
+	{
+		match: func(s string) bool {
+			return strings.Contains(s, "context deadline exceeded") && (strings.Contains(s, "cleanup") || strings.Contains(s, "delete"))
+		},
+		reason: "Context deadline during cleanup",
+	},
+	{
+		match: func(s string) bool {
+			return strings.Contains(s, "dns") && (strings.Contains(s, "resolution") || strings.Contains(s, "lookup")) && strings.Contains(s, "failed")
+		},
+		reason: "DNS resolution failure",
+	},
+	{
+		match:  func(s string) bool { return strings.Contains(s, "imagepullbackoff") },
+		reason: "Image pull backoff (transient)",
+	},
+	{
+		match:  func(s string) bool { return strings.Contains(s, "no space left on device") },
+		reason: "Disk space exhausted",
+	},
+}
+
+// IsKnownTransient checks if a failure message matches a known transient pattern
+// that doesn't need AI analysis. Returns the reason if transient, empty string otherwise.
+func IsKnownTransient(failureMessage string) string {
+	lower := strings.ToLower(failureMessage)
+	for _, p := range knownTransientPatterns {
+		if p.match(lower) {
+			return p.reason
+		}
+	}
+	return ""
+}
+
 // ---------- Quick summary ----------
 
 // QuickSummary generates a brief AI summary of a test failure.
@@ -148,6 +199,105 @@ func (c *Client) DeepAnalysis(ctx context.Context, testName string, consecutiveF
 
 	_ = c.cache.Set(key, analysis)
 	return analysis, nil
+}
+
+// ---------- Comprehensive analysis ----------
+
+// AnalysisParams holds all available artifact data for comprehensive analysis.
+type AnalysisParams struct {
+	TestName            string
+	FailureMessage      string
+	FailureBody         string
+	ConsecutiveFailures int
+	BuildLogTail        string // last 200 lines
+	AzureActivityLog    string // excerpt
+	MachineBootLog      string // boot.log or cloud-init-output.log content
+	MachineKubeletLog   string // kubelet.log excerpt
+	ClusterFlavor       string // e.g., "prow-azl3", "prow-flatcar-sysext"
+}
+
+// ComprehensiveAnalysis generates a thorough debugging analysis by examining
+// all available artifacts. This is used for non-transient failures.
+func (c *Client) ComprehensiveAnalysis(ctx context.Context, params AnalysisParams) (*models.AIAnalysis, error) {
+	key := comprehensiveCacheKey(params)
+
+	if raw, ok := c.cache.Get(key); ok {
+		var a models.AIAnalysis
+		if json.Unmarshal(raw, &a) == nil {
+			return &a, nil
+		}
+	}
+
+	var sb strings.Builder
+	sb.WriteString("Perform a comprehensive failure analysis for this CAPZ E2E test.\n\n")
+	fmt.Fprintf(&sb, "Test: %s\n", params.TestName)
+	if params.ClusterFlavor != "" {
+		fmt.Fprintf(&sb, "Flavor: %s\n", params.ClusterFlavor)
+	}
+	fmt.Fprintf(&sb, "Failed %d consecutive times\n\n", params.ConsecutiveFailures)
+	fmt.Fprintf(&sb, "Error: %s\n", params.FailureMessage)
+
+	if params.FailureBody != "" {
+		fmt.Fprintf(&sb, "\nStack trace:\n%s\n", truncate(params.FailureBody, 2000))
+	}
+	if params.BuildLogTail != "" {
+		fmt.Fprintf(&sb, "\nBuild log (last 200 lines):\n%s\n", truncate(params.BuildLogTail, 4000))
+	}
+	if params.AzureActivityLog != "" {
+		fmt.Fprintf(&sb, "\nAzure activity log:\n%s\n", truncate(params.AzureActivityLog, 2000))
+	}
+	if params.MachineBootLog != "" {
+		fmt.Fprintf(&sb, "\nMachine boot/cloud-init log:\n%s\n", truncate(params.MachineBootLog, 3000))
+	}
+	if params.MachineKubeletLog != "" {
+		fmt.Fprintf(&sb, "\nMachine kubelet log:\n%s\n", truncate(params.MachineKubeletLog, 3000))
+	}
+
+	sb.WriteString("\nFollow the triage order: build log → kubelet log → cloud-init log → activity log.\n")
+	sb.WriteString("Identify the root cause, not just the symptom. If the error is from a VM extension, ")
+	sb.WriteString("debug cloud-init instead. If networking components are failing, trace the dependency ")
+	sb.WriteString("chain (kube-proxy → CNI → CoreDNS → CCM).\n\n")
+	sb.WriteString(`Respond in JSON: {"root_cause": "...", "severity": "...", "suggested_fix": "...", "relevant_files": [...]}`)
+
+	resp, err := c.callAPI(ctx, DeepModel, systemPrompt, sb.String())
+	if err != nil {
+		return nil, err
+	}
+
+	var parsed deepAnalysisResponse
+	cleaned := extractJSON(resp)
+	if err := json.Unmarshal([]byte(cleaned), &parsed); err != nil {
+		parsed = deepAnalysisResponse{
+			RootCause:    resp,
+			Severity:     "Medium",
+			SuggestedFix: "Unable to parse structured response",
+		}
+	}
+
+	analysis := &models.AIAnalysis{
+		GeneratedAt:   time.Now().UTC().Format(time.RFC3339),
+		Model:         DeepModel,
+		RootCause:     parsed.RootCause,
+		Severity:      parsed.Severity,
+		SuggestedFix:  parsed.SuggestedFix,
+		RelevantFiles: parsed.RelevantFiles,
+	}
+
+	_ = c.cache.Set(key, analysis)
+	return analysis, nil
+}
+
+// comprehensiveCacheKey builds a deterministic cache key from all analysis params.
+func comprehensiveCacheKey(p AnalysisParams) string {
+	h := sha256.New()
+	h.Write([]byte(p.TestName))
+	h.Write([]byte(normalizeError(p.FailureMessage)))
+	h.Write([]byte(p.BuildLogTail))
+	h.Write([]byte(p.AzureActivityLog))
+	h.Write([]byte(p.MachineBootLog))
+	h.Write([]byte(p.MachineKubeletLog))
+	sum := h.Sum(nil)
+	return fmt.Sprintf("comprehensive:%x", sum[:8])
 }
 
 // ---------- API helper ----------

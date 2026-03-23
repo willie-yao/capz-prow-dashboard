@@ -56,7 +56,7 @@ func TestCacheExpiry(t *testing.T) {
 	// Manually back-date the entry.
 	c.mu.Lock()
 	entry := c.entries["old"]
-	entry.CreatedAt = time.Now().Add(-25 * time.Hour)
+	entry.CreatedAt = time.Now().Add(-31 * 24 * time.Hour)
 	c.entries["old"] = entry
 	c.mu.Unlock()
 
@@ -245,6 +245,68 @@ func TestCacheHitSkipsAPICall(t *testing.T) {
 
 	if s1.Summary != s2.Summary {
 		t.Error("cached summary should match original")
+	}
+}
+
+func TestIsKnownTransient(t *testing.T) {
+	cases := []struct {
+		msg  string
+		want string
+	}{
+		{"HTTP 429 Too Many Requests", "Azure API throttling (HTTP 429)"},
+		{"Azure throttling on resource group", "Azure API throttling (HTTP 429)"},
+		{"Too many requests from client", "Azure API throttling (HTTP 429)"},
+		{"quota exceeded for StandardDSv3Family", "Azure resource quota exceeded"},
+		{"resource quota limit reached", "Azure resource quota exceeded"},
+		{"context deadline exceeded during cleanup", "Context deadline during cleanup"},
+		{"context deadline exceeded: delete resource group", "Context deadline during cleanup"},
+		{"dns resolution failed for mcr.microsoft.com", "DNS resolution failure"},
+		{"dns lookup failed for storage.googleapis.com", "DNS resolution failure"},
+		{"ImagePullBackOff for calico-node", "Image pull backoff (transient)"},
+		{"no space left on device", "Disk space exhausted"},
+		{"kubelet certificate expired", ""},
+		{"control plane never initialized", ""},
+		{"calico-node CrashLoopBackOff", ""},
+	}
+	for _, tc := range cases {
+		got := IsKnownTransient(tc.msg)
+		if got != tc.want {
+			t.Errorf("IsKnownTransient(%q) = %q, want %q", tc.msg, got, tc.want)
+		}
+	}
+}
+
+func TestComprehensiveAnalysisWithMock(t *testing.T) {
+	jsonResp := `{"root_cause":"cloud-init failed to download kubelet binary","severity":"Critical","suggested_fix":"Fix the binary URL in preKubeadmCommands","relevant_files":["templates/cluster-template-prow-azl3.yaml"]}`
+	srv := newMockServer(t, jsonResp)
+	defer srv.Close()
+
+	client := newTestClient(t, srv.URL)
+	ctx := context.Background()
+
+	analysis, err := client.ComprehensiveAnalysis(ctx, AnalysisParams{
+		TestName:            "TestAzl3ControlPlane",
+		FailureMessage:      "Timed out waiting for control plane",
+		FailureBody:         "timeout after 10m",
+		ConsecutiveFailures: 5,
+		BuildLogTail:        "FATAL: kubeadm init failed",
+		MachineBootLog:      "cloud-init: download failed: 404",
+		ClusterFlavor:       "prow-azl3",
+	})
+	if err != nil {
+		t.Fatalf("ComprehensiveAnalysis: %v", err)
+	}
+	if analysis.RootCause != "cloud-init failed to download kubelet binary" {
+		t.Errorf("unexpected root_cause: %q", analysis.RootCause)
+	}
+	if analysis.Severity != "Critical" {
+		t.Errorf("unexpected severity: %q", analysis.Severity)
+	}
+	if analysis.Model != DeepModel {
+		t.Errorf("unexpected model: %q", analysis.Model)
+	}
+	if len(analysis.RelevantFiles) != 1 {
+		t.Errorf("unexpected relevant_files: %v", analysis.RelevantFiles)
 	}
 }
 
