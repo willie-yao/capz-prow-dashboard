@@ -163,7 +163,7 @@ func newTestClient(t *testing.T, serverURL string) *Client {
 }
 
 func TestQuickSummaryWithMock(t *testing.T) {
-	srv := newMockServer(t, "This is a transient throttling error from Azure ARM APIs.")
+	srv := newMockServer(t, `{"summary": "This is a transient throttling error from Azure ARM APIs.", "is_transient": true}`)
 	defer srv.Close()
 
 	client := newTestClient(t, srv.URL)
@@ -284,14 +284,14 @@ func TestComprehensiveAnalysisWithMock(t *testing.T) {
 	client := newTestClient(t, srv.URL)
 	ctx := context.Background()
 
-	analysis, err := client.ComprehensiveAnalysis(ctx, AnalysisParams{
-		TestName:            "TestAzl3ControlPlane",
-		FailureMessage:      "Timed out waiting for control plane",
-		FailureBody:         "timeout after 10m",
-		ConsecutiveFailures: 5,
-		BuildLogTail:        "FATAL: kubeadm init failed",
-		MachineBootLog:      "cloud-init: download failed: 404",
-		ClusterFlavor:       "prow-azl3",
+	analysis, err := client.ComprehensiveAnalysis(ctx, Evidence{
+		TestName:         "TestAzl3ControlPlane",
+		FailureMessage:   "Timed out waiting for control plane",
+		FailureBody:      "timeout after 10m",
+		ConsecutiveCount: 5,
+		BuildLogErrors:   "FATAL: kubeadm init failed",
+		BootLog:          "cloud-init: download failed: 404",
+		ClusterFlavor:    "prow-azl3",
 	})
 	if err != nil {
 		t.Fatalf("ComprehensiveAnalysis: %v", err)
@@ -311,7 +311,7 @@ func TestComprehensiveAnalysisWithMock(t *testing.T) {
 }
 
 func TestQuickSummaryReturnsAISummaryType(t *testing.T) {
-	srv := newMockServer(t, "The kubelet failed to start due to certificate expiration. This is a real bug.")
+	srv := newMockServer(t, `{"summary": "The kubelet failed to start due to certificate expiration. This is a real bug.", "is_transient": false}`)
 	defer srv.Close()
 
 	client := newTestClient(t, srv.URL)

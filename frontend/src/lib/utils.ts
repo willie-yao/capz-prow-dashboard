@@ -85,3 +85,70 @@ export const categoryLabels: Record<string, string> = {
   scalability: "Scalability",
   other: "Other",
 };
+
+const CAPZ_REPO = "https://github.com/kubernetes-sigs/cluster-api-provider-azure/blob/main/";
+
+/** Turn a file path from AI analysis into a URL if possible. */
+export function fileToUrl(
+  filePath: string,
+  context?: { buildLogUrl?: string; clusterArtifacts?: { machines?: { logs: Record<string, string> }[] } }
+): string | null {
+  const clean = filePath.replace(/\s*\(.*\)$/, "").trim();
+  const lower = clean.toLowerCase();
+
+  // Match artifact/log references to actual URLs from context
+  if (context) {
+    if (/build-log/i.test(lower) && context.buildLogUrl) {
+      return context.buildLogUrl;
+    }
+    const machines = context.clusterArtifacts?.machines;
+    if (machines && machines.length > 0) {
+      const logs = machines[0].logs;
+      if (/cloud-init-output/i.test(lower) && logs["cloud-init-output.log"]) {
+        return logs["cloud-init-output.log"];
+      }
+      if (/cloud-init\.log/i.test(lower) && logs["cloud-init.log"]) {
+        return logs["cloud-init.log"];
+      }
+      if (/boot\.log/i.test(lower) && logs["boot.log"]) {
+        return logs["boot.log"];
+      }
+      if (/kubelet\.log/i.test(lower) && logs["kubelet.log"]) {
+        return logs["kubelet.log"];
+      }
+      if (/kube-apiserver/i.test(lower) && logs["kube-apiserver.log"]) {
+        return logs["kube-apiserver.log"];
+      }
+      if (/journal\.log/i.test(lower) && logs["journal.log"]) {
+        return logs["journal.log"];
+      }
+      if (/containerd/i.test(lower) && logs["containerd.log"]) {
+        return logs["containerd.log"];
+      }
+    }
+  }
+
+  // Skip descriptive text that isn't a real path
+  if (/\.status\.|portal\.azure|azuremachine.*field|controller.*log/i.test(clean)) {
+    return null;
+  }
+
+  // Only link repo files that look like they belong to the CAPZ repo
+  const capzPrefixes = /^(test|templates|pkg|scripts|api|exp|hack|config|deploy|cloud|cmd|util|feature)\//;
+  if (/\.(go|yaml|yml|sh|json|tpl|md)$/.test(clean) && capzPrefixes.test(clean)) {
+    return CAPZ_REPO + clean;
+  }
+  return null;
+}
+
+/** Returns sort priority: 0 = GCS artifact, 1 = CAPZ repo, 2 = other/unlinked */
+export function fileSortKey(
+  filePath: string,
+  context?: Parameters<typeof fileToUrl>[1]
+): number {
+  const url = fileToUrl(filePath, context);
+  if (!url) return 2;
+  if (url.includes("storage.googleapis.com") || url.includes("gcsweb.k8s.io")) return 0;
+  if (url.includes("github.com")) return 1;
+  return 2;
+}

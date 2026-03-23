@@ -18,12 +18,12 @@ import (
 )
 
 const (
-	// ModelsAPIURL is the GitHub Models inference endpoint.
-	ModelsAPIURL = "https://models.github.ai/inference/chat/completions"
-	// DefaultModel is fast/cheap, used for quick summaries.
-	DefaultModel = "openai/gpt-4.1-mini"
+	// ModelsAPIURL is the GitHub Copilot chat completions endpoint.
+	ModelsAPIURL = "https://api.githubcopilot.com/chat/completions"
+	// DefaultModel is fast, used for quick summaries.
+	DefaultModel = "claude-sonnet-4.5"
 	// DeepModel is more capable, used for deep root-cause analysis.
-	DeepModel = "openai/gpt-4.1"
+	DeepModel = "claude-opus-4.6"
 
 	callDelay = 500 * time.Millisecond
 )
@@ -116,9 +116,9 @@ func (c *Client) QuickSummary(ctx context.Context, testName, failureMessage, fai
 	}
 
 	userMsg := fmt.Sprintf(
-		"Give a brief 1-2 sentence summary of why this CAPZ E2E test failed. "+
-			"State whether this looks transient or like a real bug.\n\n"+
-			"Test: %s\nError: %s\nLocation: %s",
+		"Give a brief 1-2 sentence summary of why this CAPZ E2E test failed.\n\n"+
+			"Test: %s\nError: %s\nLocation: %s\n\n"+
+			"Respond in JSON: {\"summary\": \"...\", \"is_transient\": true/false}",
 		testName, failureMessage, failureLocation,
 	)
 
@@ -127,10 +127,22 @@ func (c *Client) QuickSummary(ctx context.Context, testName, failureMessage, fai
 		return nil, err
 	}
 
+	// Try to parse structured response.
+	type summaryResponse struct {
+		Summary     string `json:"summary"`
+		IsTransient bool   `json:"is_transient"`
+	}
+	var parsed summaryResponse
+	cleaned := extractJSON(resp)
+	if err := json.Unmarshal([]byte(cleaned), &parsed); err != nil {
+		// Fallback: use raw text, assume not transient.
+		parsed = summaryResponse{Summary: resp, IsTransient: false}
+	}
+
 	summary := &models.AISummary{
 		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
-		Summary:     resp,
-		IsTransient: detectTransient(resp),
+		Summary:     parsed.Summary,
+		IsTransient: parsed.IsTransient,
 	}
 
 	_ = c.cache.Set(key, summary)
@@ -203,23 +215,10 @@ func (c *Client) DeepAnalysis(ctx context.Context, testName string, consecutiveF
 
 // ---------- Comprehensive analysis ----------
 
-// AnalysisParams holds all available artifact data for comprehensive analysis.
-type AnalysisParams struct {
-	TestName            string
-	FailureMessage      string
-	FailureBody         string
-	ConsecutiveFailures int
-	BuildLogTail        string // last 200 lines
-	AzureActivityLog    string // excerpt
-	MachineBootLog      string // boot.log or cloud-init-output.log content
-	MachineKubeletLog   string // kubelet.log excerpt
-	ClusterFlavor       string // e.g., "prow-azl3", "prow-flatcar-sysext"
-}
-
-// ComprehensiveAnalysis generates a thorough debugging analysis by examining
-// all available artifacts. This is used for non-transient failures.
-func (c *Client) ComprehensiveAnalysis(ctx context.Context, params AnalysisParams) (*models.AIAnalysis, error) {
-	key := comprehensiveCacheKey(params)
+// ComprehensiveAnalysis generates a thorough debugging analysis using all
+// available artifact evidence. This replaces the old AnalysisParams-based version.
+func (c *Client) ComprehensiveAnalysis(ctx context.Context, evidence Evidence) (*models.AIAnalysis, error) {
+	key := comprehensiveCacheKey(evidence)
 
 	if raw, ok := c.cache.Get(key); ok {
 		var a models.AIAnalysis
@@ -229,35 +228,48 @@ func (c *Client) ComprehensiveAnalysis(ctx context.Context, params AnalysisParam
 	}
 
 	var sb strings.Builder
-	sb.WriteString("Perform a comprehensive failure analysis for this CAPZ E2E test.\n\n")
-	fmt.Fprintf(&sb, "Test: %s\n", params.TestName)
-	if params.ClusterFlavor != "" {
-		fmt.Fprintf(&sb, "Flavor: %s\n", params.ClusterFlavor)
+	sb.WriteString("Investigate this CAPZ E2E test failure using the artifact data below.\n\n")
+	fmt.Fprintf(&sb, "Test: %s\n", evidence.TestName)
+	if evidence.ClusterFlavor != "" {
+		fmt.Fprintf(&sb, "Flavor: %s\n", evidence.ClusterFlavor)
 	}
-	fmt.Fprintf(&sb, "Failed %d consecutive times\n\n", params.ConsecutiveFailures)
-	fmt.Fprintf(&sb, "Error: %s\n", params.FailureMessage)
+	fmt.Fprintf(&sb, "Failed %d consecutive times\n\n", evidence.ConsecutiveCount)
+	fmt.Fprintf(&sb, "Error: %s\n", evidence.FailureMessage)
 
-	if params.FailureBody != "" {
-		fmt.Fprintf(&sb, "\nStack trace:\n%s\n", truncate(params.FailureBody, 2000))
-	}
-	if params.BuildLogTail != "" {
-		fmt.Fprintf(&sb, "\nBuild log (last 200 lines):\n%s\n", truncate(params.BuildLogTail, 4000))
-	}
-	if params.AzureActivityLog != "" {
-		fmt.Fprintf(&sb, "\nAzure activity log:\n%s\n", truncate(params.AzureActivityLog, 2000))
-	}
-	if params.MachineBootLog != "" {
-		fmt.Fprintf(&sb, "\nMachine boot/cloud-init log:\n%s\n", truncate(params.MachineBootLog, 3000))
-	}
-	if params.MachineKubeletLog != "" {
-		fmt.Fprintf(&sb, "\nMachine kubelet log:\n%s\n", truncate(params.MachineKubeletLog, 3000))
+	if evidence.FailureBody != "" {
+		fmt.Fprintf(&sb, "\nStack trace:\n%s\n", truncate(evidence.FailureBody, 1000))
 	}
 
-	sb.WriteString("\nFollow the triage order: build log → kubelet log → cloud-init log → activity log.\n")
-	sb.WriteString("Identify the root cause, not just the symptom. If the error is from a VM extension, ")
-	sb.WriteString("debug cloud-init instead. If networking components are failing, trace the dependency ")
-	sb.WriteString("chain (kube-proxy → CNI → CoreDNS → CCM).\n\n")
-	sb.WriteString(`Respond in JSON: {"root_cause": "...", "severity": "...", "suggested_fix": "...", "relevant_files": [...]}`)
+	if evidence.BuildLogErrors != "" {
+		fmt.Fprintf(&sb, "\n=== Build Log Errors ===\n%s\n", evidence.BuildLogErrors)
+	}
+	if evidence.MachineYAMLs != "" {
+		fmt.Fprintf(&sb, "\n=== Machine Status (CAPI) ===\n%s\n", evidence.MachineYAMLs)
+	}
+	if evidence.AzureMachineYAMLs != "" {
+		fmt.Fprintf(&sb, "\n=== AzureMachine Status ===\n%s\n", evidence.AzureMachineYAMLs)
+	}
+	if evidence.KCPStatus != "" {
+		fmt.Fprintf(&sb, "\n=== KubeadmControlPlane Status ===\n%s\n", evidence.KCPStatus)
+	}
+	if evidence.CloudInitLog != "" {
+		fmt.Fprintf(&sb, "\n=== Cloud-Init Log ===\n%s\n", evidence.CloudInitLog)
+	}
+	if evidence.BootLog != "" {
+		fmt.Fprintf(&sb, "\n=== Boot Log ===\n%s\n", evidence.BootLog)
+	}
+	if evidence.KubeletLog != "" {
+		fmt.Fprintf(&sb, "\n=== Kubelet Log ===\n%s\n", evidence.KubeletLog)
+	}
+	if evidence.AzureActivityLog != "" {
+		fmt.Fprintf(&sb, "\n=== Azure Activity Log ===\n%s\n", evidence.AzureActivityLog)
+	}
+
+	sb.WriteString("\nBased on the evidence above, identify the ROOT CAUSE (not just symptoms).\n")
+	sb.WriteString("Follow the dependency chain: build log → machine status → cloud-init → kubelet → activity log.\n")
+	sb.WriteString("If Machine FailureMessage exists, that is usually the direct cause.\n")
+	sb.WriteString("If cloud-init failed, check what command failed and why.\n\n")
+	sb.WriteString(`Respond in JSON: {"root_cause": "specific root cause based on evidence", "severity": "Critical/High/Medium/Low", "suggested_fix": "specific actionable fix", "relevant_files": ["file1.go", "file2.yaml"]}`)
 
 	resp, err := c.callAPI(ctx, DeepModel, systemPrompt, sb.String())
 	if err != nil {
@@ -287,15 +299,12 @@ func (c *Client) ComprehensiveAnalysis(ctx context.Context, params AnalysisParam
 	return analysis, nil
 }
 
-// comprehensiveCacheKey builds a deterministic cache key from all analysis params.
-func comprehensiveCacheKey(p AnalysisParams) string {
+// comprehensiveCacheKey builds a deterministic cache key from test name and failure message.
+// We intentionally exclude volatile artifact content so cache hits are stable across runs.
+func comprehensiveCacheKey(ev Evidence) string {
 	h := sha256.New()
-	h.Write([]byte(p.TestName))
-	h.Write([]byte(normalizeError(p.FailureMessage)))
-	h.Write([]byte(p.BuildLogTail))
-	h.Write([]byte(p.AzureActivityLog))
-	h.Write([]byte(p.MachineBootLog))
-	h.Write([]byte(p.MachineKubeletLog))
+	h.Write([]byte(ev.TestName))
+	h.Write([]byte(normalizeError(ev.FailureMessage)))
 	sum := h.Sum(nil)
 	return fmt.Sprintf("comprehensive:%x", sum[:8])
 }
@@ -341,6 +350,7 @@ func (c *Client) callAPI(ctx context.Context, model, sysPrompt, userMessage stri
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Copilot-Integration-Id", "copilot-developer-cli")
 
 	var resp *http.Response
 	for attempt := 0; attempt < 3; attempt++ {
@@ -360,6 +370,7 @@ func (c *Client) callAPI(ctx context.Context, model, sysPrompt, userMessage stri
 			req, _ = http.NewRequestWithContext(ctx, http.MethodPost, c.apiURL, bytes.NewReader(body))
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "Bearer "+c.token)
+			req.Header.Set("Copilot-Integration-Id", "copilot-developer-cli")
 			continue
 		}
 		break

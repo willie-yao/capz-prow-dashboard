@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import type { TestCase } from "../types/dashboard";
-import { formatDuration } from "../lib/utils";
+import { formatDuration, fileToUrl, fileSortKey } from "../lib/utils";
 
 interface TestCaseTableProps {
   testCases: TestCase[];
   jobName?: string;
+  buildLogUrl?: string;
 }
 
 const statusOrder: Record<string, number> = {
@@ -54,7 +55,7 @@ function highlightStackTrace(body: string): (string | React.ReactElement)[] {
   return parts;
 }
 
-export function TestCaseTable({ testCases, jobName }: TestCaseTableProps) {
+export function TestCaseTable({ testCases, jobName, buildLogUrl }: TestCaseTableProps) {
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
 
   const filtered = testCases.filter(
@@ -117,7 +118,7 @@ export function TestCaseTable({ testCases, jobName }: TestCaseTableProps) {
                     <span className="w-10 shrink-0 px-3 py-2">
                       {statusIcon(tc.status)}
                     </span>
-                    <span className="min-w-0 flex-1 truncate px-3 py-2 text-on-surface">
+                    <span className="min-w-0 flex-1 break-words px-3 py-2 text-on-surface">
                       {jobName && tc.status === "failed" ? (
                         <Link
                           to={`/job/${encodeURIComponent(jobName)}/test/${encodeURIComponent(tc.name)}`}
@@ -285,13 +286,13 @@ export function TestCaseTable({ testCases, jobName }: TestCaseTableProps) {
 
                       {/* AI deep analysis panel */}
                       {tc.ai_analysis && (
-                        <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-2">
+                        <div className="rounded-lg border border-primary/30 bg-primary/5 p-5 space-y-4">
                           <div className="flex items-center gap-2">
-                            <span className="text-sm">🤖</span>
-                            <span className="font-label text-xs font-medium text-primary">
+                            <span className="text-base">🤖</span>
+                            <span className="font-label text-sm font-semibold text-primary">
                               AI Analysis
                             </span>
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                            <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                               tc.ai_analysis.severity === "Critical" || tc.ai_analysis.severity === "High"
                                 ? "bg-error/20 text-error"
                                 : tc.ai_analysis.severity === "Medium"
@@ -301,16 +302,37 @@ export function TestCaseTable({ testCases, jobName }: TestCaseTableProps) {
                               {tc.ai_analysis.severity}
                             </span>
                           </div>
-                          <p className="text-xs text-on-surface leading-relaxed">
-                            <span className="font-medium">Root Cause:</span> {tc.ai_analysis.root_cause}
-                          </p>
-                          <p className="text-xs text-on-surface leading-relaxed">
-                            <span className="font-medium">Suggested Fix:</span> {tc.ai_analysis.suggested_fix}
-                          </p>
+                          <div>
+                            <p className="font-label text-xs font-semibold text-on-surface-variant mb-1">Root Cause</p>
+                            <p className="text-sm text-on-surface leading-relaxed whitespace-pre-line">
+                              {tc.ai_analysis.root_cause}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="font-label text-xs font-semibold text-on-surface-variant mb-1">Suggested Fix</p>
+                            <p className="text-sm text-on-surface leading-relaxed whitespace-pre-line">
+                              {tc.ai_analysis.suggested_fix}
+                            </p>
+                          </div>
                           {tc.ai_analysis.relevant_files && tc.ai_analysis.relevant_files.length > 0 && (
-                            <div className="text-xs text-on-surface-variant">
-                              <span className="font-medium">Files to check:</span>{" "}
-                              {tc.ai_analysis.relevant_files.join(", ")}
+                            <div>
+                              <p className="font-label text-xs font-semibold text-on-surface-variant mb-1">Files to Check</p>
+                              <ul className="list-disc list-inside text-sm text-on-surface space-y-0.5">
+                                {[...tc.ai_analysis.relevant_files]
+                                  .sort((a, b) => fileSortKey(a, { buildLogUrl, clusterArtifacts: tc.cluster_artifacts }) - fileSortKey(b, { buildLogUrl, clusterArtifacts: tc.cluster_artifacts }))
+                                  .map((f, i) => {
+                                  const url = fileToUrl(f, { buildLogUrl, clusterArtifacts: tc.cluster_artifacts });
+                                  return (
+                                    <li key={i} className="font-mono text-xs">
+                                      {url ? (
+                                        <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{f}</a>
+                                      ) : (
+                                        <span className="text-on-surface-variant">{f}</span>
+                                      )}
+                                    </li>
+                                  );
+                                })}
+                              </ul>
                             </div>
                           )}
                         </div>

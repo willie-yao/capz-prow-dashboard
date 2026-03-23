@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useJobDetail } from "../hooks/useData";
-import { formatDuration, timeAgo } from "../lib/utils";
+import { formatDuration, timeAgo, fileToUrl, fileSortKey } from "../lib/utils";
 import { DurationChart } from "../components/DurationChart";
 import type { BuildResult, TestCase } from "../types/dashboard";
 
@@ -567,13 +567,13 @@ export function TestDetailPage() {
 
           {/* AI analysis panel */}
           {selectedTc.ai_analysis && (
-            <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-2">
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-5 space-y-4">
               <div className="flex items-center gap-2">
-                <span className="text-sm">🤖</span>
-                <span className="font-label text-xs font-medium text-primary">
+                <span className="text-base">🤖</span>
+                <span className="font-label text-sm font-semibold text-primary">
                   AI Analysis
                 </span>
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                   selectedTc.ai_analysis.severity === "Critical" || selectedTc.ai_analysis.severity === "High"
                     ? "bg-error/20 text-error"
                     : selectedTc.ai_analysis.severity === "Medium"
@@ -583,16 +583,37 @@ export function TestDetailPage() {
                   {selectedTc.ai_analysis.severity}
                 </span>
               </div>
-              <p className="text-xs text-on-surface leading-relaxed">
-                <span className="font-medium">Root Cause:</span> {selectedTc.ai_analysis.root_cause}
-              </p>
-              <p className="text-xs text-on-surface leading-relaxed">
-                <span className="font-medium">Suggested Fix:</span> {selectedTc.ai_analysis.suggested_fix}
-              </p>
+              <div>
+                <p className="font-label text-xs font-semibold text-on-surface-variant mb-1">Root Cause</p>
+                <p className="text-sm text-on-surface leading-relaxed whitespace-pre-line">
+                  {selectedTc.ai_analysis.root_cause}
+                </p>
+              </div>
+              <div>
+                <p className="font-label text-xs font-semibold text-on-surface-variant mb-1">Suggested Fix</p>
+                <p className="text-sm text-on-surface leading-relaxed whitespace-pre-line">
+                  {selectedTc.ai_analysis.suggested_fix}
+                </p>
+              </div>
               {selectedTc.ai_analysis.relevant_files && selectedTc.ai_analysis.relevant_files.length > 0 && (
-                <div className="text-xs text-on-surface-variant">
-                  <span className="font-medium">Files to check:</span>{" "}
-                  {selectedTc.ai_analysis.relevant_files.join(", ")}
+                <div>
+                  <p className="font-label text-xs font-semibold text-on-surface-variant mb-1">Files to Check</p>
+                  <ul className="list-disc list-inside text-sm text-on-surface space-y-0.5">
+                    {[...selectedTc.ai_analysis.relevant_files]
+                      .sort((a, b) => fileSortKey(a, { buildLogUrl: selectedRun?.build_log_url, clusterArtifacts: selectedTc.cluster_artifacts }) - fileSortKey(b, { buildLogUrl: selectedRun?.build_log_url, clusterArtifacts: selectedTc.cluster_artifacts }))
+                      .map((f, i) => {
+                      const url = fileToUrl(f, { buildLogUrl: selectedRun?.build_log_url, clusterArtifacts: selectedTc.cluster_artifacts });
+                      return (
+                        <li key={i} className="font-mono text-xs">
+                          {url ? (
+                            <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{f}</a>
+                          ) : (
+                            <span className="text-on-surface-variant">{f}</span>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
               )}
             </div>

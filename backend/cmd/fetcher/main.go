@@ -418,68 +418,6 @@ func analyzeFailuresWithAI(ctx context.Context, details []models.JobDetail, flak
 				// Comprehensive analysis for all non-transient failures.
 				log.Printf("  🔍 Deep analyzing: %s", tc.Name)
 
-				var buildLogTail, activityExcerpt, bootLog, kubeletLog string
-
-				// Fetch build log tail (last 200 lines).
-				if run.BuildLogURL != "" {
-					if logData, err := gcs.FetchRaw(ctx, httpClient, run.BuildLogURL); err == nil {
-						lines := strings.Split(string(logData), "\n")
-						if len(lines) > 200 {
-							lines = lines[len(lines)-200:]
-						}
-						buildLogTail = strings.Join(lines, "\n")
-					}
-				}
-
-				// Fetch Azure activity log.
-				if tc.ClusterArtifacts != nil && tc.ClusterArtifacts.AzureActivityLog != "" {
-					if actData, err := gcs.FetchRaw(ctx, httpClient, tc.ClusterArtifacts.AzureActivityLog); err == nil {
-						activityExcerpt = string(actData)
-					}
-				}
-
-				// Fetch machine boot.log or cloud-init-output.log from first machine.
-				if tc.ClusterArtifacts != nil && len(tc.ClusterArtifacts.Machines) > 0 {
-					for _, m := range tc.ClusterArtifacts.Machines {
-						if bootLog != "" && kubeletLog != "" {
-							break
-						}
-						if bootLog == "" {
-							if url, ok := m.Logs["boot.log"]; ok && url != "" {
-								if data, err := gcs.FetchRaw(ctx, httpClient, url); err == nil {
-									lines := strings.Split(string(data), "\n")
-									if len(lines) > 200 {
-										lines = lines[len(lines)-200:]
-									}
-									bootLog = strings.Join(lines, "\n")
-								}
-							}
-							if bootLog == "" {
-								if url, ok := m.Logs["cloud-init-output.log"]; ok && url != "" {
-									if data, err := gcs.FetchRaw(ctx, httpClient, url); err == nil {
-										lines := strings.Split(string(data), "\n")
-										if len(lines) > 200 {
-											lines = lines[len(lines)-200:]
-										}
-										bootLog = strings.Join(lines, "\n")
-									}
-								}
-							}
-						}
-						if kubeletLog == "" {
-							if url, ok := m.Logs["kubelet.log"]; ok && url != "" {
-								if data, err := gcs.FetchRaw(ctx, httpClient, url); err == nil {
-									lines := strings.Split(string(data), "\n")
-									if len(lines) > 200 {
-										lines = lines[:200]
-									}
-									kubeletLog = strings.Join(lines, "\n")
-								}
-							}
-						}
-					}
-				}
-
 				// Determine cluster flavor from cluster name.
 				var flavor string
 				if tc.ClusterArtifacts != nil && tc.ClusterArtifacts.ClusterName != "" {
@@ -493,17 +431,23 @@ func analyzeFailuresWithAI(ctx context.Context, details []models.JobDetail, flak
 					consec = 1
 				}
 
-				analysis, err := aiClient.ComprehensiveAnalysis(ctx, ai.AnalysisParams{
-					TestName:            tc.Name,
-					FailureMessage:      tc.FailureMessage,
-					FailureBody:         tc.FailureBody,
-					ConsecutiveFailures: consec,
-					BuildLogTail:        buildLogTail,
-					AzureActivityLog:    activityExcerpt,
-					MachineBootLog:      bootLog,
-					MachineKubeletLog:   kubeletLog,
-					ClusterFlavor:       flavor,
+				var bootstrapURL string
+				if tc.ClusterArtifacts != nil {
+					bootstrapURL = tc.ClusterArtifacts.BootstrapResourcesURL
+				}
+
+				evidence := ai.CollectEvidence(ctx, httpClient, ai.EvidenceParams{
+					TestName:              tc.Name,
+					FailureMessage:        tc.FailureMessage,
+					FailureBody:           tc.FailureBody,
+					ClusterFlavor:         flavor,
+					ConsecutiveCount:      consec,
+					BuildLogURL:           run.BuildLogURL,
+					BootstrapResourcesURL: bootstrapURL,
+					ClusterArtifacts:      tc.ClusterArtifacts,
 				})
+
+				analysis, err := aiClient.ComprehensiveAnalysis(ctx, evidence)
 				if err != nil {
 					log.Printf("  ⚠ AI deep analysis failed for %s: %v", tc.Name, err)
 					continue
