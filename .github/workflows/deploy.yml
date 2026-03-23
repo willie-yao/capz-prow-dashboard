@@ -36,6 +36,13 @@ jobs:
         working-directory: backend
         run: go build -o ../fetcher ./cmd/fetcher/
 
+      # Restore AI analysis cache so only new/changed failures are re-analyzed
+      - name: Restore AI cache
+        uses: actions/cache@v4
+        with:
+          path: frontend/public/data/ai_cache.json
+          key: ai-cache
+
       - name: Fetch test data
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
