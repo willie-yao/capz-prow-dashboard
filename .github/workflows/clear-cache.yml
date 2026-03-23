@@ -1,0 +1,24 @@
+name: Clear AI Cache
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  actions: write
+
+jobs:
+  clear-cache:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clear AI cache entries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          echo "Listing AI cache entries..."
+          gh cache list --repo "$REPO" --key ai-cache- --json id,key | \
+            jq -r '.[].key' | while read key; do
+              echo "Deleting cache: $key"
+              gh cache delete "$key" --repo "$REPO"
+            done
+          echo "AI cache cleared. Next deploy will regenerate all analyses."

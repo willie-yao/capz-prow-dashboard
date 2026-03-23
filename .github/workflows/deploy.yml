@@ -36,15 +36,8 @@ jobs:
         working-directory: backend
         run: go build -o ../fetcher ./cmd/fetcher/
 
-      # Restore AI analysis cache.
-      # On push: use commit SHA in key so cache is busted (fresh analysis).
-      # On schedule/manual: use static key to reuse cached analyses.
-      - name: Clear AI cache on push
-        if: github.event_name == 'push'
-        run: rm -f frontend/public/data/ai_cache.json
-
+      # Restore AI analysis cache so only new/changed failures are re-analyzed
       - name: Restore AI cache
-        if: github.event_name != 'push'
         uses: actions/cache/restore@v4
         with:
           path: frontend/public/data/ai_cache.json
