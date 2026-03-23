@@ -8,7 +8,7 @@ interface TestResultsGridProps {
   jobName: string;
 }
 
-type CellStatus = "passed" | "failed" | "skipped";
+type CellStatus = "passed" | "failed" | "skipped" | "absent";
 
 interface GridRow {
   testName: string;
@@ -22,10 +22,6 @@ const setupPatterns =
 function shortDate(dateStr: string): string {
   const d = new Date(dateStr);
   return `${d.getMonth() + 1}/${d.getDate()}`;
-}
-
-function truncate(s: string, max: number): string {
-  return s.length > max ? s.slice(0, max) + "…" : s;
 }
 
 export function TestResultsGrid({ runs, jobName }: TestResultsGridProps) {
