@@ -46,6 +46,7 @@ jobs:
       - name: Fetch test data
         env:
           AI_TOKEN: ${{ secrets.AI_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./fetcher -builds=8 -workers=5 -out=frontend/public/data -timeout=10m -ai
 
       # --- React frontend ---

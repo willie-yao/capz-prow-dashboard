@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/willie-yao/capz-prow-dashboard/backend/internal/models"
@@ -71,6 +72,10 @@ func discoverConfigFiles(ctx context.Context, client *http.Client) ([]string, er
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	// Use GITHUB_TOKEN for authenticated requests (higher rate limit).
+	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {
