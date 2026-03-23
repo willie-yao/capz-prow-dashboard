@@ -564,6 +564,49 @@ export function TestDetailPage() {
                 )}
             </div>
           )}
+
+          {/* AI analysis panel */}
+          {selectedTc.ai_analysis && (
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm">🤖</span>
+                <span className="font-label text-xs font-medium text-primary">
+                  AI Analysis
+                </span>
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                  selectedTc.ai_analysis.severity === "Critical" || selectedTc.ai_analysis.severity === "High"
+                    ? "bg-error/20 text-error"
+                    : selectedTc.ai_analysis.severity === "Medium"
+                      ? "bg-tertiary/20 text-tertiary"
+                      : "bg-on-surface-variant/20 text-on-surface-variant"
+                }`}>
+                  {selectedTc.ai_analysis.severity}
+                </span>
+              </div>
+              <p className="text-xs text-on-surface leading-relaxed">
+                <span className="font-medium">Root Cause:</span> {selectedTc.ai_analysis.root_cause}
+              </p>
+              <p className="text-xs text-on-surface leading-relaxed">
+                <span className="font-medium">Suggested Fix:</span> {selectedTc.ai_analysis.suggested_fix}
+              </p>
+              {selectedTc.ai_analysis.relevant_files && selectedTc.ai_analysis.relevant_files.length > 0 && (
+                <div className="text-xs text-on-surface-variant">
+                  <span className="font-medium">Files to check:</span>{" "}
+                  {selectedTc.ai_analysis.relevant_files.join(", ")}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* AI summary (if no deep analysis) */}
+          {selectedTc.ai_summary && !selectedTc.ai_analysis && (
+            <div className="flex items-start gap-2 rounded-lg bg-surface-container p-3">
+              <span className="text-xs">🤖</span>
+              <span className={`text-xs ${selectedTc.ai_summary.is_transient ? "text-on-surface-variant" : "text-tertiary"}`}>
+                {selectedTc.ai_summary.summary}
+              </span>
+            </div>
+          )}
         </section>
       )}
 

@@ -31,6 +31,23 @@ type BuildInfo struct {
 	JUnitURL         string    `json:"junit_url,omitempty"`
 }
 
+// AISummary is a brief AI-generated explanation of a test failure.
+type AISummary struct {
+	GeneratedAt string `json:"generated_at"`
+	Summary     string `json:"summary"`
+	IsTransient bool   `json:"is_transient"`
+}
+
+// AIAnalysis is a deep AI-generated root cause analysis for persistent failures.
+type AIAnalysis struct {
+	GeneratedAt   string   `json:"generated_at"`
+	Model         string   `json:"model"`
+	RootCause     string   `json:"root_cause"`
+	Severity      string   `json:"severity"` // Critical, High, Medium, Low, Transient-Ignore
+	SuggestedFix  string   `json:"suggested_fix"`
+	RelevantFiles []string `json:"relevant_files,omitempty"`
+}
+
 // TestCase represents a single test case from JUnit XML.
 type TestCase struct {
 	Name             string            `json:"name"`
@@ -41,6 +58,8 @@ type TestCase struct {
 	FailureLocation  string            `json:"failure_location,omitempty"`
 	FailureLocURL    string            `json:"failure_location_url,omitempty"`
 	ClusterArtifacts *ClusterArtifacts `json:"cluster_artifacts,omitempty"`
+	AISummary        *AISummary        `json:"ai_summary,omitempty"`
+	AIAnalysis       *AIAnalysis       `json:"ai_analysis,omitempty"`
 }
 
 // ClusterArtifacts holds links to debug artifacts for a specific cluster.

@@ -3,3 +3,4 @@ dist
 public/data/dashboard.json
 public/data/jobs/
 public/data/flakiness.json
+public/data/ai_cache.json

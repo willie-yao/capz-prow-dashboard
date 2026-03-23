@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/willie-yao/capz-prow-dashboard/backend/internal/aggregator"
+	"github.com/willie-yao/capz-prow-dashboard/backend/internal/ai"
 	"github.com/willie-yao/capz-prow-dashboard/backend/internal/artifacts"
 	"github.com/willie-yao/capz-prow-dashboard/backend/internal/config"
 	"github.com/willie-yao/capz-prow-dashboard/backend/internal/gcs"
@@ -35,7 +36,17 @@ func run() error {
 	workers := flag.Int("workers", 5, "number of concurrent job fetchers")
 	timeout := flag.Duration("timeout", 10*time.Minute, "overall fetch timeout")
 	periodicOnly := flag.Bool("periodic-only", true, "only fetch periodic jobs (skip presubmits)")
+	enableAI := flag.Bool("ai", false, "enable AI-powered failure analysis")
 	flag.Parse()
+
+	aiToken := os.Getenv("AI_TOKEN")
+	if *enableAI && aiToken == "" {
+		aiToken = os.Getenv("GITHUB_TOKEN")
+	}
+	if *enableAI && aiToken == "" {
+		log.Println("Warning: -ai enabled but no AI_TOKEN or GITHUB_TOKEN set, disabling AI analysis")
+		*enableAI = false
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 	defer cancel()
@@ -137,6 +148,11 @@ func run() error {
 	flakinessReport := aggregator.ComputeFlakinessReport(jobResultMap, now)
 	log.Printf("Flakiness report: %d most flaky, %d persistent, %d recently broken",
 		len(flakinessReport.MostFlaky), len(flakinessReport.PersistentFailures), len(flakinessReport.RecentlyBroken))
+
+	// Step 5: AI failure analysis (optional).
+	if *enableAI {
+		analyzeFailuresWithAI(ctx, details, flakinessReport, aiToken, *outDir)
+	}
 
 	log.Printf("Writing output to %s/ (%d jobs)", *outDir, len(dashboard.Jobs))
 	if err := output.WriteAll(*outDir, dashboard, details, flakinessReport); err != nil {
@@ -260,4 +276,92 @@ func fetchBuildResult(ctx context.Context, client *http.Client, jobName, buildID
 	}
 
 	return result, nil
+}
+
+// analyzeFailuresWithAI runs AI analysis on failed test cases.
+func analyzeFailuresWithAI(ctx context.Context, details []models.JobDetail, flakinessReport models.FlakinessReport, token, outDir string) {
+	aiClient := ai.NewClient(token, outDir)
+	defer func() {
+		if err := aiClient.Cache().Save(); err != nil {
+			log.Printf("Warning: failed to save AI cache: %v", err)
+		}
+	}()
+
+	// Build a lookup of consecutive failure counts from the flakiness report.
+	consecutiveMap := make(map[string]int)
+	for _, tf := range flakinessReport.PersistentFailures {
+		consecutiveMap[tf.TestName] = tf.ConsecutiveFailures
+	}
+
+	var totalFailures, persistentCount int
+	for _, d := range details {
+		if len(d.Runs) == 0 {
+			continue
+		}
+		latestRun := d.Runs[0]
+		for i := range latestRun.TestCases {
+			tc := &latestRun.TestCases[i]
+			if tc.Status != "failed" {
+				continue
+			}
+			totalFailures++
+			consec := consecutiveMap[tc.Name]
+			if consec >= 3 {
+				persistentCount++
+			}
+		}
+	}
+
+	if totalFailures == 0 {
+		log.Println("🤖 No failures to analyze")
+		return
+	}
+	log.Printf("🤖 Analyzing %d failures (%d persistent)...", totalFailures, persistentCount)
+
+	for i := range details {
+		if len(details[i].Runs) == 0 {
+			continue
+		}
+		latestRun := &details[i].Runs[0]
+		for j := range latestRun.TestCases {
+			tc := &latestRun.TestCases[j]
+			if tc.Status != "failed" {
+				continue
+			}
+
+			summary, err := aiClient.QuickSummary(ctx, tc.Name, tc.FailureMessage, tc.FailureLocation)
+			if err != nil {
+				log.Printf("  ⚠ AI summary failed for %s: %v", tc.Name, err)
+				continue
+			}
+			tc.AISummary = summary
+
+			consec := consecutiveMap[tc.Name]
+			if consec >= 3 {
+				var buildLogTail, activityExcerpt string
+				if latestRun.BuildLogURL != "" {
+					if logData, err := gcs.FetchRaw(ctx, &http.Client{Timeout: 30 * time.Second}, latestRun.BuildLogURL); err == nil {
+						lines := strings.Split(string(logData), "\n")
+						if len(lines) > 100 {
+							lines = lines[len(lines)-100:]
+						}
+						buildLogTail = strings.Join(lines, "\n")
+					}
+				}
+				if tc.ClusterArtifacts != nil && tc.ClusterArtifacts.AzureActivityLog != "" {
+					if actData, err := gcs.FetchRaw(ctx, &http.Client{Timeout: 30 * time.Second}, tc.ClusterArtifacts.AzureActivityLog); err == nil {
+						activityExcerpt = string(actData)
+					}
+				}
+
+				analysis, err := aiClient.DeepAnalysis(ctx, tc.Name, consec, tc.FailureMessage, tc.FailureBody, buildLogTail, activityExcerpt)
+				if err != nil {
+					log.Printf("  ⚠ AI deep analysis failed for %s: %v", tc.Name, err)
+					continue
+				}
+				tc.AIAnalysis = analysis
+			}
+		}
+	}
+	log.Println("🤖 AI analysis complete")
 }

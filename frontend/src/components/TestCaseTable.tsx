@@ -159,6 +159,19 @@ export function TestCaseTable({ testCases, jobName }: TestCaseTableProps) {
                     </span>
                   </div>
 
+                  {/* AI summary — shown inline for failed tests without expanding */}
+                  {tc.ai_summary && (
+                    <div className={`flex items-start gap-2 px-6 py-1.5 ${stripe}`}>
+                      <span className="text-xs">🤖</span>
+                      <span className={`text-xs ${tc.ai_summary.is_transient ? "text-on-surface-variant" : "text-tertiary"}`}>
+                        {tc.ai_summary.summary}
+                        {tc.ai_summary.is_transient && (
+                          <span className="ml-1 text-on-surface-variant/60">· Likely transient</span>
+                        )}
+                      </span>
+                    </div>
+                  )}
+
                   {hasFail && isExpanded && (
                     <div className="border-t border-outline-variant bg-error/5 px-6 py-4 space-y-3">
                       {/* Failure message */}
@@ -266,6 +279,39 @@ export function TestCaseTable({ testCases, jobName }: TestCaseTableProps) {
                                 ))}
                               </div>
                             </details>
+                          )}
+                        </div>
+                      )}
+
+                      {/* AI deep analysis panel */}
+                      {tc.ai_analysis && (
+                        <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm">🤖</span>
+                            <span className="font-label text-xs font-medium text-primary">
+                              AI Analysis
+                            </span>
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                              tc.ai_analysis.severity === "Critical" || tc.ai_analysis.severity === "High"
+                                ? "bg-error/20 text-error"
+                                : tc.ai_analysis.severity === "Medium"
+                                  ? "bg-tertiary/20 text-tertiary"
+                                  : "bg-on-surface-variant/20 text-on-surface-variant"
+                            }`}>
+                              {tc.ai_analysis.severity}
+                            </span>
+                          </div>
+                          <p className="text-xs text-on-surface leading-relaxed">
+                            <span className="font-medium">Root Cause:</span> {tc.ai_analysis.root_cause}
+                          </p>
+                          <p className="text-xs text-on-surface leading-relaxed">
+                            <span className="font-medium">Suggested Fix:</span> {tc.ai_analysis.suggested_fix}
+                          </p>
+                          {tc.ai_analysis.relevant_files && tc.ai_analysis.relevant_files.length > 0 && (
+                            <div className="text-xs text-on-surface-variant">
+                              <span className="font-medium">Files to check:</span>{" "}
+                              {tc.ai_analysis.relevant_files.join(", ")}
+                            </div>
                           )}
                         </div>
                       )}

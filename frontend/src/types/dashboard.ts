@@ -41,6 +41,23 @@ export interface TestCase {
   failure_location?: string;
   failure_location_url?: string;
   cluster_artifacts?: ClusterArtifacts;
+  ai_summary?: AISummary;
+  ai_analysis?: AIAnalysis;
+}
+
+export interface AISummary {
+  generated_at: string;
+  summary: string;
+  is_transient: boolean;
+}
+
+export interface AIAnalysis {
+  generated_at: string;
+  model: string;
+  root_cause: string;
+  severity: string;
+  suggested_fix: string;
+  relevant_files?: string[];
 }
 
 export interface ClusterArtifacts {
