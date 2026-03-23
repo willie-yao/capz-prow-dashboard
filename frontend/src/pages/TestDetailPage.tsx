@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useJobDetail } from "../hooks/useData";
-import { formatDuration, timeAgo, fileToUrl, fileSortKey } from "../lib/utils";
+import { formatDuration, timeAgo, fileToUrl, fileSortKey, formatSteps } from "../lib/utils";
 import { DurationChart } from "../components/DurationChart";
 import type { BuildResult, TestCase } from "../types/dashboard";
 
@@ -592,7 +592,7 @@ export function TestDetailPage() {
               <div>
                 <p className="font-label text-xs font-semibold text-on-surface-variant mb-1">Suggested Fix</p>
                 <p className="text-sm text-on-surface leading-relaxed whitespace-pre-line">
-                  {selectedTc.ai_analysis.suggested_fix}
+                  {formatSteps(selectedTc.ai_analysis.suggested_fix)}
                 </p>
               </div>
               {selectedTc.ai_analysis.relevant_files && selectedTc.ai_analysis.relevant_files.length > 0 && (

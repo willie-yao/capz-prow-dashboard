@@ -9,6 +9,7 @@ import {
 } from "../lib/utils";
 import type { BuildResult, TestCase } from "../types/dashboard";
 import { RunTimeline } from "../components/RunTimeline";
+import { TestResultsGrid } from "../components/TestResultsGrid";
 import { TestCaseTable } from "../components/TestCaseTable";
 
 export function JobDetailPage() {
@@ -145,6 +146,14 @@ export function JobDetailPage() {
               selectedBuildId={selectedBuildId}
               onSelect={handleSelectRun}
             />
+          </section>
+
+          {/* Test results grid */}
+          <section>
+            <h2 className="font-headline mb-3 text-lg font-semibold text-on-surface">
+              Test Results Grid
+            </h2>
+            <TestResultsGrid runs={runs} jobName={jobName!} />
           </section>
 
           {/* Selected run details */}

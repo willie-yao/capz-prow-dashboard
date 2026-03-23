@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import type { TestCase } from "../types/dashboard";
-import { formatDuration, fileToUrl, fileSortKey } from "../lib/utils";
+import { formatDuration, fileToUrl, fileSortKey, formatSteps } from "../lib/utils";
 
 interface TestCaseTableProps {
   testCases: TestCase[];
@@ -311,7 +311,7 @@ export function TestCaseTable({ testCases, jobName, buildLogUrl }: TestCaseTable
                           <div>
                             <p className="font-label text-xs font-semibold text-on-surface-variant mb-1">Suggested Fix</p>
                             <p className="text-sm text-on-surface leading-relaxed whitespace-pre-line">
-                              {tc.ai_analysis.suggested_fix}
+                              {formatSteps(tc.ai_analysis.suggested_fix)}
                             </p>
                           </div>
                           {tc.ai_analysis.relevant_files && tc.ai_analysis.relevant_files.length > 0 && (

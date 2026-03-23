@@ -86,6 +86,17 @@ export const categoryLabels: Record<string, string> = {
   other: "Other",
 };
 
+/** Split text with inline numbered/bulleted steps into separate lines. */
+export function formatSteps(text: string): string {
+  // Insert newlines before numbered steps like "2." "3." etc. (not "1." at start)
+  let result = text.replace(/\s+(\d+)\.\s/g, (match, num) => {
+    return Number(num) > 1 ? `\n${num}. ` : match;
+  });
+  // Insert newlines before bullet markers
+  result = result.replace(/\s+[-•]\s/g, "\n• ");
+  return result;
+}
+
 const CAPZ_REPO = "https://github.com/kubernetes-sigs/cluster-api-provider-azure/blob/main/";
 
 /** Turn a file path from AI analysis into a URL if possible. */
