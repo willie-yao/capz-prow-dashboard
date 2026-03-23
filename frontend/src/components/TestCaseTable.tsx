@@ -15,7 +15,19 @@ const statusOrder: Record<string, number> = {
   skipped: 2,
 };
 
-import { HiCheckCircle, HiXCircle, HiMinusCircle } from "react-icons/hi2";
+import {
+  HiCheckCircle,
+  HiXCircle,
+  HiMinusCircle,
+  HiSparkles,
+  HiMagnifyingGlass,
+  HiClipboardDocumentList,
+  HiArchiveBox,
+  HiCloud,
+  HiServerStack,
+  HiMapPin,
+  HiChevronRight,
+} from "react-icons/hi2";
 
 function statusIcon(status: string) {
   switch (status) {
@@ -165,7 +177,7 @@ export function TestCaseTable({ testCases, jobName, buildLogUrl }: TestCaseTable
                   {/* AI summary — shown inline for failed tests without expanding */}
                   {tc.ai_summary && (
                     <div className={`flex items-start gap-2 pl-16 pr-6 py-1.5 ${stripe}`}>
-                      <span className="text-xs">🤖</span>
+                      <HiSparkles className="h-4 w-4 shrink-0 text-primary" />
                       <span className={`text-xs ${tc.ai_summary.is_transient ? "text-on-surface-variant" : "text-tertiary"}`}>
                         {tc.ai_summary.summary}
                         {tc.ai_summary.is_transient && (
@@ -186,7 +198,7 @@ export function TestCaseTable({ testCases, jobName, buildLogUrl }: TestCaseTable
                       {tc.failure_body && (
                         <details className="group/trace [&>summary]:list-none [&>summary::-webkit-details-marker]:hidden">
                           <summary className="cursor-pointer font-label text-xs text-on-surface-variant hover:text-on-surface transition-colors">
-                            <span className="inline-block transition-transform group-open/trace:rotate-90">▶</span> Stack Trace
+                            <HiChevronRight className="h-4 w-4 inline-block transition-transform duration-200 group-open/trace:rotate-90" /> Stack Trace
                           </summary>
                           <pre className="mt-2 whitespace-pre-wrap font-label text-xs leading-relaxed text-on-surface-variant">
                             {highlightStackTrace(tc.failure_body)}
@@ -197,7 +209,7 @@ export function TestCaseTable({ testCases, jobName, buildLogUrl }: TestCaseTable
                       {/* Source location link */}
                       {tc.failure_location && (
                         <div className="flex items-center gap-2 text-xs">
-                          <span className="text-on-surface-variant">📍</span>
+                          <HiMapPin className="h-4 w-4 text-on-surface-variant" />
                           {tc.failure_location_url ? (
                             <a
                               href={tc.failure_location_url}
@@ -218,19 +230,19 @@ export function TestCaseTable({ testCases, jobName, buildLogUrl }: TestCaseTable
                       {/* Cluster artifact links */}
                       {tc.cluster_artifacts && (
                         <div className="rounded-lg border border-outline-variant bg-surface-container p-3 space-y-2">
-                          <p className="font-label text-xs font-medium text-on-surface">
-                            🔍 Debug Artifacts — {tc.cluster_artifacts.cluster_name}
+                          <p className="font-label text-sm font-semibold text-on-surface">
+                            Debug Artifacts — {tc.cluster_artifacts.cluster_name}
                           </p>
 
-                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                          <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs">
                             {tc.cluster_artifacts.azure_activity_log && (
                               <a
                                 href={tc.cluster_artifacts.azure_activity_log}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-primary hover:underline"
+                                className="inline-flex items-center gap-1 text-primary hover:underline"
                               >
-                                ☁️ Azure Activity Log
+                                <HiCloud className="h-3.5 w-3.5 shrink-0" /> Azure Activity Log
                               </a>
                             )}
                             {tc.cluster_artifacts.bootstrap_resources_url && (
@@ -238,9 +250,9 @@ export function TestCaseTable({ testCases, jobName, buildLogUrl }: TestCaseTable
                                 href={tc.cluster_artifacts.bootstrap_resources_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-primary hover:underline"
+                                className="inline-flex items-center gap-1 text-primary hover:underline"
                               >
-                                📋 Cluster Resources
+                                <HiClipboardDocumentList className="h-3.5 w-3.5 shrink-0" /> Cluster Resources
                               </a>
                             )}
                             {tc.cluster_artifacts.pod_log_dirs && Object.entries(tc.cluster_artifacts.pod_log_dirs).map(([dir, url]) => (
@@ -249,17 +261,18 @@ export function TestCaseTable({ testCases, jobName, buildLogUrl }: TestCaseTable
                                 href={url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-primary hover:underline"
+                                className="inline-flex items-center gap-1 text-primary hover:underline"
                               >
-                                📦 {dir}
+                                <HiArchiveBox className="h-3.5 w-3.5 shrink-0" /> {dir}
                               </a>
                             ))}
                           </div>
 
                           {tc.cluster_artifacts.machines && tc.cluster_artifacts.machines.length > 0 && (
                             <details className="group/machines [&>summary]:list-none [&>summary::-webkit-details-marker]:hidden">
-                              <summary className="cursor-pointer font-label text-xs text-on-surface-variant hover:text-on-surface transition-colors">
-                                <span className="inline-block transition-transform group-open/machines:rotate-90">▶</span> 🖥️ Machine Logs ({tc.cluster_artifacts.machines.length} machines)
+                              <summary className="cursor-pointer font-label text-xs text-on-surface-variant hover:text-on-surface transition-colors inline-flex items-center gap-1">
+                                <HiChevronRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 group-open/machines:rotate-90" />
+                                <HiServerStack className="h-3.5 w-3.5 shrink-0" /> Machine Logs ({tc.cluster_artifacts.machines.length} machines)
                               </summary>
                               <div className="mt-2 space-y-2">
                                 {tc.cluster_artifacts.machines.map((m) => (
@@ -290,7 +303,7 @@ export function TestCaseTable({ testCases, jobName, buildLogUrl }: TestCaseTable
                       {tc.ai_analysis && (
                         <div className="rounded-lg border border-primary/30 bg-primary/5 p-5 space-y-4">
                           <div className="flex items-center gap-2">
-                            <span className="text-base">🤖</span>
+                            <HiSparkles className="h-5 w-5 text-primary" />
                             <span className="font-label text-sm font-semibold text-primary">
                               AI Analysis
                             </span>

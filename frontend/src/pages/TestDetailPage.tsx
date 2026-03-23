@@ -4,6 +4,16 @@ import { useJobDetail } from "../hooks/useData";
 import { formatDuration, timeAgo, fileToUrl, fileSortKey, formatSteps } from "../lib/utils";
 import { DurationChart } from "../components/DurationChart";
 import type { BuildResult, TestCase } from "../types/dashboard";
+import {
+  HiSparkles,
+  HiMagnifyingGlass,
+  HiClipboardDocumentList,
+  HiArchiveBox,
+  HiCloud,
+  HiServerStack,
+  HiMapPin,
+  HiChevronRight,
+} from "react-icons/hi2";
 
 /** Strip numbers and hex strings to normalize error messages for grouping. */
 function normalizeMessage(msg: string): string {
@@ -460,7 +470,7 @@ export function TestDetailPage() {
           {selectedTc.failure_body && (
             <details className="group/trace [&>summary]:list-none [&>summary::-webkit-details-marker]:hidden">
               <summary className="cursor-pointer font-label text-xs text-on-surface-variant transition-colors hover:text-on-surface">
-                <span className="inline-block transition-transform group-open/trace:rotate-90">▶</span> Stack Trace
+                <HiChevronRight className="h-4 w-4 inline-block transition-transform duration-200 group-open/trace:rotate-90" /> Stack Trace
               </summary>
               <pre className="mt-2 whitespace-pre-wrap font-label text-xs leading-relaxed text-on-surface-variant">
                 {highlightStackTrace(selectedTc.failure_body)}
@@ -471,7 +481,7 @@ export function TestDetailPage() {
           {/* Source location */}
           {selectedTc.failure_location && (
             <div className="flex items-center gap-2 text-xs">
-              <span className="text-on-surface-variant">📍</span>
+              <HiMapPin className="h-4 w-4 text-on-surface-variant" />
               {selectedTc.failure_location_url ? (
                 <a
                   href={selectedTc.failure_location_url}
@@ -492,20 +502,19 @@ export function TestDetailPage() {
           {/* Cluster artifacts */}
           {selectedTc.cluster_artifacts && (
             <div className="rounded-lg border border-outline-variant bg-surface-container p-3 space-y-2">
-              <p className="font-label text-xs font-medium text-on-surface">
-                🔍 Debug Artifacts —{" "}
-                {selectedTc.cluster_artifacts.cluster_name}
+              <p className="font-label text-sm font-semibold text-on-surface">
+                Debug Artifacts — {selectedTc.cluster_artifacts.cluster_name}
               </p>
 
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+              <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs">
                 {selectedTc.cluster_artifacts.azure_activity_log && (
                   <a
                     href={selectedTc.cluster_artifacts.azure_activity_log}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-primary hover:underline"
+                    className="inline-flex items-center gap-1 text-primary hover:underline"
                   >
-                    ☁️ Azure Activity Log
+                    <HiCloud className="h-3.5 w-3.5 shrink-0" /> Azure Activity Log
                   </a>
                 )}
                 {selectedTc.cluster_artifacts.bootstrap_resources_url && (
@@ -513,9 +522,9 @@ export function TestDetailPage() {
                     href={selectedTc.cluster_artifacts.bootstrap_resources_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-primary hover:underline"
+                    className="inline-flex items-center gap-1 text-primary hover:underline"
                   >
-                    📋 Cluster Resources
+                    <HiClipboardDocumentList className="h-3.5 w-3.5 shrink-0" /> Cluster Resources
                   </a>
                 )}
                 {selectedTc.cluster_artifacts.pod_log_dirs && Object.entries(selectedTc.cluster_artifacts.pod_log_dirs).map(([dir, url]) => (
@@ -524,9 +533,9 @@ export function TestDetailPage() {
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-primary hover:underline"
+                    className="inline-flex items-center gap-1 text-primary hover:underline"
                   >
-                    📦 {dir}
+                    <HiArchiveBox className="h-3.5 w-3.5 shrink-0" /> {dir}
                   </a>
                 ))}
               </div>
@@ -534,8 +543,9 @@ export function TestDetailPage() {
               {selectedTc.cluster_artifacts.machines &&
                 selectedTc.cluster_artifacts.machines.length > 0 && (
                   <details className="group/machines [&>summary]:list-none [&>summary::-webkit-details-marker]:hidden">
-                    <summary className="cursor-pointer font-label text-xs text-on-surface-variant transition-colors hover:text-on-surface">
-                      <span className="inline-block transition-transform group-open/machines:rotate-90">▶</span> 🖥️ Machine Logs (
+                    <summary className="cursor-pointer font-label text-xs text-on-surface-variant transition-colors hover:text-on-surface inline-flex items-center gap-1">
+                      <HiChevronRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-200 group-open/machines:rotate-90" />
+                      <HiServerStack className="h-3.5 w-3.5 shrink-0" /> Machine Logs (
                       {selectedTc.cluster_artifacts.machines.length} machines)
                     </summary>
                     <div className="mt-2 space-y-2">
@@ -569,7 +579,7 @@ export function TestDetailPage() {
           {selectedTc.ai_analysis && (
             <div className="rounded-lg border border-primary/30 bg-primary/5 p-5 space-y-4">
               <div className="flex items-center gap-2">
-                <span className="text-base">🤖</span>
+                <HiSparkles className="h-5 w-5 text-primary" />
                 <span className="font-label text-sm font-semibold text-primary">
                   AI Analysis
                 </span>
@@ -622,7 +632,7 @@ export function TestDetailPage() {
           {/* AI summary (if no deep analysis) */}
           {selectedTc.ai_summary && !selectedTc.ai_analysis && (
             <div className="flex items-start gap-2 rounded-lg bg-surface-container p-3">
-              <span className="text-xs">🤖</span>
+              <HiSparkles className="h-4 w-4 shrink-0 text-primary" />
               <span className={`text-xs ${selectedTc.ai_summary.is_transient ? "text-on-surface-variant" : "text-tertiary"}`}>
                 {selectedTc.ai_summary.summary}
               </span>

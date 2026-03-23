@@ -88,12 +88,13 @@ export const categoryLabels: Record<string, string> = {
 
 /** Split text with inline numbered/bulleted steps into separate lines. */
 export function formatSteps(text: string): string {
-  // Insert newlines before numbered steps: "2." "3." etc, or "(2)" "(3)" etc
+  // Insert newlines before numbered steps: "2." "3." etc (not "1." at start of text)
   let result = text.replace(/\s+(\d+)\.\s/g, (match, num) => {
     return Number(num) > 1 ? `\n${num}. ` : match;
   });
-  result = result.replace(/\s+\((\d+)\)\s/g, (match, num) => {
-    return Number(num) > 1 ? `\n(${num}) ` : match;
+  // Insert newlines before parenthesized numbers: "(1)" "(2)" etc when preceded by text
+  result = result.replace(/([.!?:])?\s+\((\d+)\)\s/g, (match, punct, num) => {
+    return `${punct || ""}\n(${num}) `;
   });
   // Insert newlines before bullet markers
   result = result.replace(/\s+[-•]\s/g, "\n• ");

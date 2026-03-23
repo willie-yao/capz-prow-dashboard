@@ -4,6 +4,7 @@ import { useFlakinessReport } from "../hooks/useData";
 import { formatPercent, timeAgo } from "../lib/utils";
 import { DurationChart } from "../components/DurationChart";
 import type { TestFlakiness } from "../types/dashboard";
+import { HiFaceSmile, HiChevronRight } from "react-icons/hi2";
 
 type Tab = "most_flaky" | "persistent" | "recently_broken";
 
@@ -119,9 +120,9 @@ function TestRow({ item, tab }: { item: TestFlakiness; tab: Tab }) {
 
           {/* Expand indicator */}
           <span
-            className={`shrink-0 text-on-surface-variant text-xs transition-transform ${expanded ? "rotate-90" : ""}`}
+            className={`shrink-0 text-on-surface-variant transition-transform duration-200 ${expanded ? "rotate-90" : ""}`}
           >
-            ▶
+            <HiChevronRight className="h-4 w-4" />
           </span>
         </div>
 
@@ -272,8 +273,8 @@ export function FlakinessPage() {
       {/* Content */}
       {items.length === 0 ? (
         <div className="glass rounded-xl py-16 text-center">
-          <p className="text-on-surface-variant text-lg">
-            No flaky tests found 🎉
+          <p className="text-on-surface-variant text-lg flex items-center justify-center gap-2">
+            No flaky tests found <HiFaceSmile className="h-5 w-5" />
           </p>
         </div>
       ) : (

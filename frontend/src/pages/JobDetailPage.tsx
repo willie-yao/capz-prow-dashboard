@@ -11,6 +11,7 @@ import type { BuildResult, TestCase } from "../types/dashboard";
 import { RunTimeline } from "../components/RunTimeline";
 import { TestResultsGrid } from "../components/TestResultsGrid";
 import { TestCaseTable } from "../components/TestCaseTable";
+import { HiChevronRight } from "react-icons/hi2";
 
 export function JobDetailPage() {
   const { jobName } = useParams<{ jobName: string }>();
@@ -156,7 +157,7 @@ export function JobDetailPage() {
               onClick={() => setGridOpen(!gridOpen)}
               className="flex items-center gap-2 font-headline text-lg font-semibold text-on-surface hover:text-primary transition-colors"
             >
-              <span className={`inline-block transition-transform duration-200 ${gridOpen ? "rotate-90" : ""}`}>▶</span>
+              <span className={`inline-block transition-transform duration-200 ${gridOpen ? "rotate-90" : ""}`}><HiChevronRight className="h-5 w-5" /></span>
               Test Results Grid
             </button>
             <div
