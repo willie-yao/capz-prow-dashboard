@@ -265,11 +265,11 @@ func (c *Client) ComprehensiveAnalysis(ctx context.Context, evidence Evidence) (
 		fmt.Fprintf(&sb, "\n=== Azure Activity Log ===\n%s\n", evidence.AzureActivityLog)
 	}
 
-	sb.WriteString("\nBased on the evidence above, identify the ROOT CAUSE (not just symptoms).\n")
-	sb.WriteString("Follow the dependency chain: build log → machine status → cloud-init → kubelet → activity log.\n")
-	sb.WriteString("If Machine FailureMessage exists, that is usually the direct cause.\n")
-	sb.WriteString("If cloud-init failed, check what command failed and why.\n\n")
-	sb.WriteString(`Respond in JSON: {"root_cause": "specific root cause based on evidence", "severity": "Critical/High/Medium/Low", "suggested_fix": "specific actionable fix", "relevant_files": ["file1.go", "file2.yaml"]}`)
+	sb.WriteString("\nBased on the evidence above, provide:\n")
+	sb.WriteString("1. ROOT CAUSE: State the specific error you found in the artifacts. Quote the actual error message or status field. Do NOT give generic possibilities — tell me exactly what went wrong based on what you see.\n")
+	sb.WriteString("2. SUGGESTED FIX: Based on the root cause you identified, give the specific fix. Do NOT say 'check the logs' — you already have the logs. Instead say what needs to change and where.\n")
+	sb.WriteString("3. If artifacts are missing or incomplete, say what you COULD determine and what remains unknown.\n\n")
+	sb.WriteString(`Respond in JSON: {"root_cause": "the specific error found in the evidence", "severity": "Critical/High/Medium/Low", "suggested_fix": "the specific fix based on what you found", "relevant_files": ["file1.go", "file2.yaml"]}`)
 
 	resp, err := c.callAPI(ctx, DeepModel, systemPrompt, sb.String())
 	if err != nil {
