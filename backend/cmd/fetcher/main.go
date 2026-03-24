@@ -395,6 +395,11 @@ func analyzeFailuresWithAI(ctx context.Context, details []models.JobDetail, flak
 					continue
 				}
 
+				// Skip if this test case already has AI analysis (from cached data).
+				if tc.AISummary != nil && tc.AIAnalysis != nil {
+					continue
+				}
+
 				// Check for known transient patterns first.
 				if reason := ai.IsKnownTransient(tc.FailureMessage); reason != "" {
 					tc.AISummary = &models.AISummary{
