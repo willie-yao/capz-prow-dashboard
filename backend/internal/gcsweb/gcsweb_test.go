@@ -2,35 +2,30 @@ package gcsweb
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"testing"
 )
 
-func loadFixture(t *testing.T, name string) []byte {
-	t.Helper()
-	data, err := os.ReadFile(filepath.Join("testdata", name))
-	if err != nil {
-		t.Fatalf("reading fixture %s: %v", name, err)
-	}
-	return data
-}
-
 func TestListBuildIDs(t *testing.T) {
-	fixture := loadFixture(t, "gcsweb_listing.html")
+	resp := gcsListResponse{
+		Prefixes: []string{
+			"logs/my-job/2034271404769153024/",
+			"logs/my-job/2035720955698790400/",
+			"logs/my-job/2034633792370569216/",
+			"logs/my-job/2034996180198326272/",
+			"logs/my-job/2035358567883448320/",
+		},
+	}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		w.Write(fixture)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
 
-	// Override base URL by calling the server directly.
-	origBase := GCSWebBaseURL
-	ids, err := listBuildIDsFromURL(context.Background(), srv.Client(), srv.URL+"/")
-	_ = origBase
+	ids, err := listAllBuildIDs(context.Background(), srv.Client(), srv.URL, "my-job")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -46,7 +41,6 @@ func TestListBuildIDs(t *testing.T) {
 	if len(ids) != len(expected) {
 		t.Fatalf("got %d IDs, want %d", len(ids), len(expected))
 	}
-
 	for i, id := range ids {
 		if id != expected[i] {
 			t.Errorf("ids[%d] = %s, want %s", i, id, expected[i])
@@ -54,68 +48,88 @@ func TestListBuildIDs(t *testing.T) {
 	}
 }
 
-func TestBackLinkExcluded(t *testing.T) {
-	fixture := loadFixture(t, "gcsweb_listing.html")
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write(fixture)
-	}))
-	defer srv.Close()
-
-	ids, err := listBuildIDsFromURL(context.Background(), srv.Client(), srv.URL+"/")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestPagination(t *testing.T) {
+	page1 := gcsListResponse{
+		Prefixes:      []string{"logs/my-job/1111111111111111111/", "logs/my-job/2222222222222222222/"},
+		NextPageToken: "token123",
+	}
+	page2 := gcsListResponse{
+		Prefixes: []string{"logs/my-job/3333333333333333333/", "logs/my-job/4444444444444444444/"},
 	}
 
-	for _, id := range ids {
-		if id == ".." || id == "" {
-			t.Errorf("back link should be excluded, got %q", id)
+	callCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		callCount++
+		if r.URL.Query().Get("pageToken") == "token123" {
+			json.NewEncoder(w).Encode(page2)
+		} else {
+			json.NewEncoder(w).Encode(page1)
 		}
-	}
-}
-
-func TestSortingNewestFirst(t *testing.T) {
-	fixture := loadFixture(t, "gcsweb_listing.html")
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write(fixture)
 	}))
 	defer srv.Close()
 
-	ids, err := listBuildIDsFromURL(context.Background(), srv.Client(), srv.URL+"/")
+	ids, err := listAllBuildIDs(context.Background(), srv.Client(), srv.URL, "my-job")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	for i := 1; i < len(ids); i++ {
-		if ids[i] > ids[i-1] {
-			t.Errorf("not sorted descending: ids[%d]=%s > ids[%d]=%s", i, ids[i], i-1, ids[i-1])
+	if callCount != 2 {
+		t.Errorf("expected 2 API calls for pagination, got %d", callCount)
+	}
+
+	expected := []string{
+		"4444444444444444444",
+		"3333333333333333333",
+		"2222222222222222222",
+		"1111111111111111111",
+	}
+	if len(ids) != len(expected) {
+		t.Fatalf("got %d IDs, want %d", len(ids), len(expected))
+	}
+	for i, id := range ids {
+		if id != expected[i] {
+			t.Errorf("ids[%d] = %s, want %s", i, id, expected[i])
 		}
 	}
 }
 
 func TestListRecentBuildIDs(t *testing.T) {
-	fixture := loadFixture(t, "gcsweb_listing.html")
+	resp := gcsListResponse{
+		Prefixes: []string{
+			"logs/my-job/1111111111111111111/",
+			"logs/my-job/2222222222222222222/",
+			"logs/my-job/3333333333333333333/",
+			"logs/my-job/4444444444444444444/",
+			"logs/my-job/5555555555555555555/",
+		},
+	}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write(fixture)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
 
-	ids, err := listRecentBuildIDsFromURL(context.Background(), srv.Client(), srv.URL+"/", 3)
+	// Temporarily test via the internal helper since we can't override the const.
+	ids, err := listAllBuildIDs(context.Background(), srv.Client(), srv.URL, "my-job")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	count := 3
+	if count > len(ids) {
+		count = len(ids)
+	}
+	ids = ids[:count]
 
 	if len(ids) != 3 {
 		t.Fatalf("got %d IDs, want 3", len(ids))
 	}
 
-	// Should be the 3 newest.
 	expected := []string{
-		"2035720955698790400",
-		"2035358567883448320",
-		"2034996180198326272",
+		"5555555555555555555",
+		"4444444444444444444",
+		"3333333333333333333",
 	}
 	for i, id := range ids {
 		if id != expected[i] {
@@ -125,38 +139,82 @@ func TestListRecentBuildIDs(t *testing.T) {
 }
 
 func TestListRecentBuildIDsCountExceedsAvailable(t *testing.T) {
-	fixture := loadFixture(t, "gcsweb_listing.html")
+	resp := gcsListResponse{
+		Prefixes: []string{
+			"logs/my-job/1111111111111111111/",
+			"logs/my-job/2222222222222222222/",
+		},
+	}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write(fixture)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
 
-	ids, err := listRecentBuildIDsFromURL(context.Background(), srv.Client(), srv.URL+"/", 100)
+	ids, err := listAllBuildIDs(context.Background(), srv.Client(), srv.URL, "my-job")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	count := 100
+	if count > len(ids) {
+		count = len(ids)
+	}
+	ids = ids[:count]
 
-	if len(ids) != 5 {
-		t.Fatalf("got %d IDs, want 5 (all available)", len(ids))
+	if len(ids) != 2 {
+		t.Fatalf("got %d IDs, want 2 (all available)", len(ids))
 	}
 }
 
-func TestEmptyListing(t *testing.T) {
-	emptyHTML := `<!DOCTYPE html><html><body><ul></ul></body></html>`
+func TestEmptyResponse(t *testing.T) {
+	resp := gcsListResponse{}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(emptyHTML))
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
 
-	ids, err := listBuildIDsFromURL(context.Background(), srv.Client(), srv.URL+"/")
+	ids, err := listAllBuildIDs(context.Background(), srv.Client(), srv.URL, "my-job")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if len(ids) != 0 {
-		t.Errorf("expected 0 IDs from empty listing, got %d", len(ids))
+		t.Errorf("expected 0 IDs from empty response, got %d", len(ids))
+	}
+}
+
+func TestFilterNonNumeric(t *testing.T) {
+	resp := gcsListResponse{
+		Prefixes: []string{
+			"logs/my-job/1111111111111111111/",
+			"logs/my-job/latest-build.txt/",
+			"logs/my-job/2222222222222222222/",
+			"logs/my-job/some-directory/",
+		},
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	ids, err := listAllBuildIDs(context.Background(), srv.Client(), srv.URL, "my-job")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := []string{"2222222222222222222", "1111111111111111111"}
+	if len(ids) != len(expected) {
+		t.Fatalf("got %d IDs, want %d", len(ids), len(expected))
+	}
+	for i, id := range ids {
+		if id != expected[i] {
+			t.Errorf("ids[%d] = %s, want %s", i, id, expected[i])
+		}
 	}
 }
 
@@ -166,49 +224,37 @@ func TestHTTPError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, err := listBuildIDsFromURL(context.Background(), srv.Client(), srv.URL+"/")
+	_, err := listAllBuildIDs(context.Background(), srv.Client(), srv.URL, "my-job")
 	if err == nil {
 		t.Fatal("expected error for 404 response")
 	}
 }
 
-// listBuildIDsFromURL is a test helper that fetches from an arbitrary URL
-// (e.g., an httptest server) instead of the hardcoded GCSWebBaseURL.
-func listBuildIDsFromURL(ctx context.Context, client *http.Client, url string) ([]string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+func TestSortingNewestFirst(t *testing.T) {
+	resp := gcsListResponse{
+		Prefixes: []string{
+			"logs/my-job/1000000000000000001/",
+			"logs/my-job/1000000000000000005/",
+			"logs/my-job/1000000000000000002/",
+			"logs/my-job/1000000000000000004/",
+			"logs/my-job/1000000000000000003/",
+		},
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	ids, err := listAllBuildIDs(context.Background(), srv.Client(), srv.URL, "my-job")
 	if err != nil {
-		return nil, err
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, &httpError{StatusCode: resp.StatusCode, URL: url}
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	return parseBuildIDs(resp.Body)
-}
-
-// listRecentBuildIDsFromURL is like listBuildIDsFromURL but returns only count results.
-func listRecentBuildIDsFromURL(ctx context.Context, client *http.Client, url string, count int) ([]string, error) {
-	ids, err := listBuildIDsFromURL(ctx, client, url)
-	if err != nil {
-		return nil, err
+	for i := 1; i < len(ids); i++ {
+		if ids[i] > ids[i-1] {
+			t.Errorf("not sorted descending: ids[%d]=%s > ids[%d]=%s", i, ids[i], i-1, ids[i-1])
+		}
 	}
-	if count > len(ids) {
-		count = len(ids)
-	}
-	return ids[:count], nil
-}
-
-type httpError struct {
-	StatusCode int
-	URL        string
-}
-
-func (e *httpError) Error() string {
-	return "unexpected status " + http.StatusText(e.StatusCode) + " for " + e.URL
 }
