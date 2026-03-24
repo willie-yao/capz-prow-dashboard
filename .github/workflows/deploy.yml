@@ -36,13 +36,13 @@ jobs:
         working-directory: backend
         run: go build -o ../fetcher ./cmd/fetcher/
 
-      # Restore AI analysis cache so only new/changed failures are re-analyzed
-      - name: Restore AI cache
+      # Restore cached data (job JSON + AI cache) so we only fetch new builds
+      - name: Restore data cache
         uses: actions/cache/restore@v4
         with:
-          path: frontend/public/data/ai_cache.json
-          key: ai-cache-${{ github.run_id }}
-          restore-keys: ai-cache-
+          path: frontend/public/data
+          key: data-cache-${{ github.run_id }}
+          restore-keys: data-cache-
 
       - name: Fetch test data
         env:
@@ -50,13 +50,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./fetcher -builds=8 -workers=5 -out=frontend/public/data -timeout=10m -ai
 
-      # Save AI cache for future cron runs
-      - name: Save AI cache
+      # Save data cache (job JSON + AI cache) for future runs
+      - name: Save data cache
         if: always()
         uses: actions/cache/save@v4
         with:
-          path: frontend/public/data/ai_cache.json
-          key: ai-cache-${{ github.run_id }}
+          path: frontend/public/data
+          key: data-cache-${{ github.run_id }}
 
       # --- React frontend ---
       - uses: actions/setup-node@v4
