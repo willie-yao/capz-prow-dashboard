@@ -6,7 +6,6 @@ import { DurationChart } from "../components/DurationChart";
 import type { BuildResult, TestCase } from "../types/dashboard";
 import {
   HiSparkles,
-  HiMagnifyingGlass,
   HiClipboardDocumentList,
   HiArchiveBox,
   HiCloud,

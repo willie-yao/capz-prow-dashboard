@@ -20,7 +20,6 @@ import {
   HiXCircle,
   HiMinusCircle,
   HiSparkles,
-  HiMagnifyingGlass,
   HiClipboardDocumentList,
   HiArchiveBox,
   HiCloud,

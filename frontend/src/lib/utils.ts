@@ -93,7 +93,7 @@ export function formatSteps(text: string): string {
     return Number(num) > 1 ? `\n${num}. ` : match;
   });
   // Insert newlines before parenthesized numbers: "(1)" "(2)" etc when preceded by text
-  result = result.replace(/([.!?:])?\s+\((\d+)\)\s/g, (match, punct, num) => {
+  result = result.replace(/([.!?:])?\s+\((\d+)\)\s/g, (_match, punct, num) => {
     return `${punct || ""}\n(${num}) `;
   });
   // Insert newlines before bullet markers
