@@ -319,7 +319,7 @@ export function TestCaseTable({ testCases, jobName, buildLogUrl }: TestCaseTable
                           <div>
                             <p className="font-label text-xs font-semibold text-on-surface-variant mb-1">Root Cause</p>
                             <p className="text-sm text-on-surface leading-relaxed whitespace-pre-line">
-                              {tc.ai_analysis.root_cause}
+                              {formatSteps(tc.ai_analysis.root_cause)}
                             </p>
                           </div>
                           <div>

@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { useJobDetail } from "../hooks/useData";
 import { formatDuration, timeAgo, fileToUrl, fileSortKey, formatSteps } from "../lib/utils";
 import { DurationChart } from "../components/DurationChart";
+import { RunTimeline } from "../components/RunTimeline";
 import type { BuildResult, TestCase } from "../types/dashboard";
 import {
   HiSparkles,
@@ -292,72 +293,27 @@ export function TestDetailPage() {
         <h2 className="font-headline mb-3 text-lg font-semibold text-on-surface">
           History
         </h2>
-        <div className="overflow-x-auto">
-          <div className="flex items-start gap-1 p-1">
-            {occurrences.map((occ, i) => {
-              const tc = occ.testCase;
-              const color = tc
-                ? tc.status === "passed"
-                  ? "bg-secondary"
-                  : tc.status === "failed"
-                    ? "bg-error"
-                    : "bg-on-surface-variant"
-                : "bg-on-surface-variant/30";
-              const isSelected = occ.run.build_id === effectiveSelectedId;
-              const showDate =
-                i % 5 === 0 || i === occurrences.length - 1;
-              const tooltip = tc
-                ? `#${occ.run.build_id} — ${tc.status}`
-                : `#${occ.run.build_id} — absent`;
-
-              return (
-                <div
-                  key={occ.run.build_id}
-                  className="flex flex-col items-center"
-                >
-                  <button
-                    type="button"
-                    onClick={() => setSelectedBuildId(occ.run.build_id)}
-                    className={`h-4 w-4 rounded-sm transition-all ${color} ${
-                      isSelected
-                        ? "ring-2 ring-primary ring-offset-1 ring-offset-surface"
-                        : "hover:brightness-125"
-                    }`}
-                    title={tooltip}
-                  />
-                  <span
-                    className={`mt-1.5 font-label text-[9px] ${showDate ? "text-on-surface-variant" : "invisible"}`}
-                  >
-                    {shortDate(occ.run.started)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <RunTimeline
+          runs={data?.runs ?? []}
+          selectedBuildId={effectiveSelectedId ?? undefined}
+          onSelect={setSelectedBuildId}
+          colorFn={(run) => {
+            const tc = (run.test_cases ?? []).find((t) => t.name === testName);
+            if (!tc) return "bg-on-surface-variant/30";
+            return tc.status === "passed"
+              ? "bg-secondary"
+              : tc.status === "failed"
+                ? "bg-error"
+                : "bg-on-surface-variant";
+          }}
+          tooltipFn={(run) => {
+            const tc = (run.test_cases ?? []).find((t) => t.name === testName);
+            return tc
+              ? `#${run.build_id} — ${tc.status.charAt(0).toUpperCase() + tc.status.slice(1)}`
+              : `#${run.build_id} — Absent`;
+          }}
+        />
       </section>
-
-      {/* Duration trend chart */}
-      {(() => {
-        const durationHistory = occurrences
-          .filter((o) => o.testCase)
-          .map((o) => ({
-            build_id: o.run.build_id,
-            timestamp: o.run.started,
-            duration: o.testCase!.duration_seconds,
-            passed: o.testCase!.status === "passed",
-          }));
-        return durationHistory.length > 0 ? (
-          <section>
-            <h2 className="font-headline mb-3 text-lg font-semibold text-on-surface">
-              Duration Trend
-            </h2>
-            <div className="glass rounded-xl p-4">
-              <DurationChart history={durationHistory} />
-            </div>
-          </section>
-        ) : null;
-      })()}
 
       {/* Failure pattern grouping */}
       {failureGroups.length > 0 && (
@@ -595,7 +551,7 @@ export function TestDetailPage() {
               <div>
                 <p className="font-label text-xs font-semibold text-on-surface-variant mb-1">Root Cause</p>
                 <p className="text-sm text-on-surface leading-relaxed whitespace-pre-line">
-                  {selectedTc.ai_analysis.root_cause}
+                  {formatSteps(selectedTc.ai_analysis.root_cause)}
                 </p>
               </div>
               <div>
@@ -648,11 +604,28 @@ export function TestDetailPage() {
           </p>
         </section>
       )}
+
+      {/* Duration trend chart */}
+      {(() => {
+        const durationHistory = occurrences
+          .filter((o) => o.testCase)
+          .map((o) => ({
+            build_id: o.run.build_id,
+            timestamp: o.run.started,
+            duration: o.testCase!.duration_seconds,
+            passed: o.testCase!.status === "passed",
+          }));
+        return durationHistory.length > 0 ? (
+          <section>
+            <h2 className="font-headline mb-3 text-lg font-semibold text-on-surface">
+              Duration Trend
+            </h2>
+            <div className="glass rounded-xl p-4">
+              <DurationChart history={durationHistory} />
+            </div>
+          </section>
+        ) : null;
+      })()}
     </div>
   );
-}
-
-function shortDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return `${d.getMonth() + 1}/${d.getDate()}`;
 }
