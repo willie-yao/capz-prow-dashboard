@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"sort"
@@ -39,42 +38,12 @@ func ListBuildIDs(ctx context.Context, client *http.Client, jobName string) ([]s
 }
 
 // ListRecentBuildIDs returns the most recent count build IDs for the given job,
-// sorted descending (newest first). It uses latest-build.txt to find the newest
-// build and then fetches only a small window of recent builds.
+// sorted descending (newest first).
 func ListRecentBuildIDs(ctx context.Context, client *http.Client, jobName string, count int) ([]string, error) {
-	return listRecentBuildIDs(ctx, client, GCSBaseURL, GCSListAPIURL, jobName, count)
+	return listRecentBuildIDs(ctx, client, GCSListAPIURL, jobName, count)
 }
 
-func listRecentBuildIDs(ctx context.Context, client *http.Client, gcsBase, apiURL, jobName string, count int) ([]string, error) {
-	// First try: get latest-build.txt to find the newest build ID.
-	latestURL := gcsBase + jobName + "/latest-build.txt"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, latestURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := client.Do(req)
-	if err == nil && resp.StatusCode == http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		latestID := strings.TrimSpace(string(body))
-
-		if isNumeric(latestID) {
-			// List builds using startOffset to skip to recent ones.
-			// Subtract enough from the latest ID to get a window.
-			// Build IDs are ~19 digits. We request more than needed to be safe.
-			ids, err := listBuildIDsWithOffset(ctx, client, apiURL, jobName, latestID, count*3)
-			if err == nil && len(ids) > 0 {
-				if count > len(ids) {
-					count = len(ids)
-				}
-				return ids[:count], nil
-			}
-		}
-	} else if resp != nil {
-		resp.Body.Close()
-	}
-
-	// Fallback: list all (slow for jobs with many builds).
+func listRecentBuildIDs(ctx context.Context, client *http.Client, apiURL, jobName string, count int) ([]string, error) {
 	ids, err := listAllBuildIDs(ctx, client, apiURL, jobName)
 	if err != nil {
 		return nil, err
@@ -85,82 +54,7 @@ func listRecentBuildIDs(ctx context.Context, client *http.Client, gcsBase, apiUR
 	return ids[:count], nil
 }
 
-// listBuildIDsWithOffset fetches build IDs near the latest one by using
-// endOffset to limit the listing from above and fetching the last page.
-func listBuildIDsWithOffset(ctx context.Context, client *http.Client, apiURL, jobName, latestID string, maxResults int) ([]string, error) {
-	prefix := gcsPrefix + jobName + "/"
-
-	// To get the LATEST builds efficiently, we list with a high startOffset
-	// that's just before the oldest build we want. Since build IDs are
-	// monotonically increasing snowflake IDs, we can estimate.
-	// We'll just ask for maxResults and rely on GCS returning from the end.
-	// Actually GCS always returns from the start, so we need a different approach:
-	// List ALL prefixes but only the last page. Use a high startOffset.
-
-	// Strategy: subtract a large amount from the latest ID to create a startOffset
-	// that skips most old builds. Build IDs increase by ~70-80 billion per day.
-	// For 30 days of builds, offset by ~30 * 80B = 2.4T.
-	latestNum := int64(0)
-	fmt.Sscanf(latestID, "%d", &latestNum)
-	startOffset := latestNum - 3_000_000_000_000_000 // ~40 days window
-	if startOffset < 0 {
-		startOffset = 0
-	}
-
-	startOffsetPrefix := fmt.Sprintf("%s%d", prefix, startOffset)
-
-	params := url.Values{
-		"prefix":      {prefix},
-		"delimiter":   {"/"},
-		"maxResults":  {fmt.Sprintf("%d", maxResults)},
-		"startOffset": {startOffsetPrefix},
-	}
-
-	var allIDs []string
-	pageToken := ""
-
-	for {
-		u := apiURL + "?" + params.Encode()
-		if pageToken != "" {
-			u += "&pageToken=" + url.QueryEscape(pageToken)
-		}
-
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-		if err != nil {
-			return nil, err
-		}
-		resp, err := client.Do(req)
-		if err != nil {
-			return nil, err
-		}
-		if resp.StatusCode != http.StatusOK {
-			resp.Body.Close()
-			return nil, fmt.Errorf("GCS API HTTP %d", resp.StatusCode)
-		}
-		var result gcsListResponse
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-			resp.Body.Close()
-			return nil, err
-		}
-		resp.Body.Close()
-
-		for _, p := range result.Prefixes {
-			if id := extractBuildID(p); id != "" {
-				allIDs = append(allIDs, id)
-			}
-		}
-
-		if result.NextPageToken == "" {
-			break
-		}
-		pageToken = result.NextPageToken
-	}
-
-	sort.Sort(sort.Reverse(sort.StringSlice(allIDs)))
-	return allIDs, nil
-}
-
-// listAllBuildIDs paginates through all build IDs (slow for large jobs).
+// listAllBuildIDs paginates through all build IDs.
 func listAllBuildIDs(ctx context.Context, client *http.Client, apiURL, jobName string) ([]string, error) {
 	prefix := gcsPrefix + jobName + "/"
 	var allIDs []string
