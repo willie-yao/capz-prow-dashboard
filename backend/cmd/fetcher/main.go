@@ -22,6 +22,7 @@ import (
 	"github.com/willie-yao/capz-prow-dashboard/backend/internal/gcsweb"
 	"github.com/willie-yao/capz-prow-dashboard/backend/internal/junit"
 	"github.com/willie-yao/capz-prow-dashboard/backend/internal/models"
+	"github.com/willie-yao/capz-prow-dashboard/backend/internal/notify"
 	"github.com/willie-yao/capz-prow-dashboard/backend/internal/output"
 )
 
@@ -162,6 +163,27 @@ func run() error {
 	log.Printf("Writing output to %s/ (%d jobs)", *outDir, len(dashboard.Jobs))
 	if err := output.WriteAll(*outDir, dashboard, details, flakinessReport); err != nil {
 		return fmt.Errorf("writing output: %w", err)
+	}
+
+	// Step 6: Teams notifications for persistent failures (optional).
+	slackWebhookURL := os.Getenv("SLACK_WEBHOOK_URL")
+	if slackWebhookURL != "" {
+		notifier := notify.NewNotifier(
+			slackWebhookURL,
+			filepath.Join(*outDir, "notification_state.json"),
+			"https://willie-yao.github.io/capz-prow-dashboard",
+		)
+		stats, err := notifier.ProcessFailures(ctx, flakinessReport, details)
+		if err != nil {
+			log.Printf("Warning: notification processing failed: %v", err)
+		} else {
+			log.Printf("📢 Notifications: %d new alerts, %d recoveries", stats.NewAlerts, stats.Recoveries)
+		}
+		if err := notifier.SaveState(); err != nil {
+			log.Printf("Warning: failed to save notification state: %v", err)
+		}
+	} else {
+		log.Println("Notifications: skipped (no SLACK_WEBHOOK_URL)")
 	}
 
 	log.Println("Done!")
