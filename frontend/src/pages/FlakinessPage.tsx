@@ -8,10 +8,10 @@ import { HiFaceSmile, HiChevronRight } from "react-icons/hi2";
 
 type Tab = "most_flaky" | "persistent" | "recently_broken";
 
-const tabs: { label: string; value: Tab }[] = [
-  { label: "Most Flaky", value: "most_flaky" },
-  { label: "Persistent Failures", value: "persistent" },
-  { label: "Recently Broken", value: "recently_broken" },
+const tabs: { label: string; value: Tab; tooltip: string }[] = [
+  { label: "Most Flaky", value: "most_flaky", tooltip: "Tests that alternate between passing and failing. Sorted by flip rate — the percentage of runs where the result changed from the previous run." },
+  { label: "Persistent Failures", value: "persistent", tooltip: "Tests that have failed 3 or more times in a row with the same error. These are consistently broken, not flaky." },
+  { label: "Recently Broken", value: "recently_broken", tooltip: "Tests that started a new failure streak within the last 48 hours. These are likely new regressions." },
 ];
 
 const JOB_PREFIX = "periodic-cluster-api-provider-azure-";
@@ -219,7 +219,7 @@ export function FlakinessPage() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-32 text-center">
-        <p className="text-error text-lg">Failed to load flakiness report</p>
+        <p className="text-error text-lg">Failed to load test analysis</p>
         <p className="text-on-surface-variant text-sm">{error}</p>
         <button
           onClick={() => window.location.reload()}
@@ -246,7 +246,7 @@ export function FlakinessPage() {
       {/* Header */}
       <div>
         <h1 className="font-headline text-3xl font-bold text-on-surface">
-          Flakiness Analytics
+          Test Analysis
         </h1>
         <p className="mt-1 text-sm text-on-surface-variant">
           Last updated: {timeAgo(data.generated_at)}
@@ -259,6 +259,7 @@ export function FlakinessPage() {
           <button
             key={t.value}
             onClick={() => setActiveTab(t.value)}
+            title={t.tooltip}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               activeTab === t.value
                 ? "bg-primary text-on-primary"
@@ -270,11 +271,16 @@ export function FlakinessPage() {
         ))}
       </div>
 
+      {/* Tab description */}
+      <p className="text-sm text-on-surface-variant -mt-4">
+        {tabs.find((t) => t.value === activeTab)?.tooltip}
+      </p>
+
       {/* Content */}
       {items.length === 0 ? (
         <div className="glass rounded-xl py-16 text-center">
           <p className="text-on-surface-variant text-lg flex items-center justify-center gap-2">
-            No flaky tests found <HiFaceSmile className="h-5 w-5" />
+            No tests match this category <HiFaceSmile className="h-5 w-5" />
           </p>
         </div>
       ) : (

@@ -7,6 +7,7 @@ import {
 } from "../lib/utils";
 import type { JobSummary } from "../types/dashboard";
 import { SummaryBar } from "../components/SummaryBar";
+import { NeedsAttention } from "../components/NeedsAttention";
 import { JobCard } from "../components/JobCard";
 
 type StatusFilter = "ALL" | "PASSING" | "FLAKY" | "FAILING";
@@ -118,6 +119,9 @@ export function DashboardPage() {
           Last updated: {timeAgo(data.generated_at)}
         </p>
       </div>
+
+      {/* Needs attention */}
+      <NeedsAttention />
 
       {/* Summary bar */}
       <SummaryBar jobs={data.jobs} onFilterClick={(s) => setStatusFilter(s as StatusFilter)} activeFilter={statusFilter} />

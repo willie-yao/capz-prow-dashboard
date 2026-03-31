@@ -36,7 +36,7 @@ export function Layout() {
                 }`
               }
             >
-              Flakiness
+              Test Analysis
             </NavLink>
           </nav>
         </div>
