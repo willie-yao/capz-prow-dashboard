@@ -5,3 +5,4 @@ public/data/jobs/
 public/data/flakiness.json
 public/data/ai_cache.json
 public/data/notification_state.json
+public/data/search-index.json

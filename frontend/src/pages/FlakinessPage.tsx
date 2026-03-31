@@ -66,9 +66,9 @@ function TestRow({ item, tab }: { item: TestFlakiness; tab: Tab }) {
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="w-full px-4 py-3 text-left"
+        className="w-full px-3 sm:px-4 py-3 text-left"
       >
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 sm:gap-4">
           {/* Test Name */}
           <div className="min-w-0 flex-1">
             <Link
@@ -254,7 +254,7 @@ export function FlakinessPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1">
+      <div className="flex flex-wrap gap-1">
         {tabs.map((t) => (
           <button
             key={t.value}

@@ -135,3 +135,19 @@ export interface JobDetail {
   name: string;
   runs: BuildResult[];
 }
+
+export interface SearchEntry {
+  kind: "job" | "test";
+  test_name: string;
+  job_name: string;
+  tab_name: string;
+  branch: string;
+  category: string;
+  status: string;
+  fail_rate: number;
+}
+
+export interface SearchIndex {
+  generated_at: string;
+  entries: SearchEntry[];
+}

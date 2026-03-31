@@ -171,6 +171,24 @@ type DurationPoint struct {
 	Passed    bool    `json:"passed"`
 }
 
+// SearchEntry represents a searchable item (either a job or a test case).
+type SearchEntry struct {
+	Kind     string  `json:"kind"`      // "job" or "test"
+	TestName string  `json:"test_name"` // empty for job entries
+	JobName  string  `json:"job_name"`
+	TabName  string  `json:"tab_name"`
+	Branch   string  `json:"branch"`
+	Category string  `json:"category"`
+	Status   string  `json:"status"`    // overall status for jobs, test status for tests
+	FailRate float64 `json:"fail_rate"` // from flakiness data if available
+}
+
+// SearchIndex is the top-level structure for search-index.json.
+type SearchIndex struct {
+	GeneratedAt string        `json:"generated_at"`
+	Entries     []SearchEntry `json:"entries"`
+}
+
 // FlakinessReport is the top-level structure for flakiness.json.
 type FlakinessReport struct {
 	GeneratedAt        string          `json:"generated_at"`

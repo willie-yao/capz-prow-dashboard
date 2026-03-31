@@ -88,7 +88,15 @@ export function TestResultsGrid({ runs, jobName }: TestResultsGridProps) {
   }
 
   return (
-    <div className="rounded-xl border border-outline-variant bg-surface">
+    <>
+      {/* Mobile message */}
+      <div className="md:hidden glass rounded-xl p-6 text-center">
+        <p className="text-sm text-on-surface-variant">
+          View on desktop for full test results grid
+        </p>
+      </div>
+      {/* Desktop grid */}
+      <div className="hidden md:block rounded-xl border border-outline-variant bg-surface">
       <div className="flex">
         {/* Test name column — fixed width, horizontally scrollable */}
         <div className="w-[300px] shrink-0 overflow-x-auto border-r border-outline-variant">
@@ -171,7 +179,8 @@ export function TestResultsGrid({ runs, jobName }: TestResultsGridProps) {
             </tbody>
           </table>
         </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

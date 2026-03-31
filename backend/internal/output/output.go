@@ -45,9 +45,14 @@ func WriteFlakinessReport(dir string, report models.FlakinessReport) error {
 	return writeJSON(filepath.Join(dir, "flakiness.json"), report)
 }
 
-// WriteAll writes dashboard.json, all job detail files, and flakiness.json.
+// WriteSearchIndex writes search-index.json to dir.
+func WriteSearchIndex(dir string, index models.SearchIndex) error {
+	return writeJSON(filepath.Join(dir, "search-index.json"), index)
+}
+
+// WriteAll writes dashboard.json, all job detail files, flakiness.json, and search-index.json.
 // Returns the first error encountered.
-func WriteAll(dir string, dashboard models.Dashboard, details []models.JobDetail, flakiness models.FlakinessReport) error {
+func WriteAll(dir string, dashboard models.Dashboard, details []models.JobDetail, flakiness models.FlakinessReport, searchIndex models.SearchIndex) error {
 	if err := WriteDashboard(dir, dashboard); err != nil {
 		return err
 	}
@@ -57,6 +62,9 @@ func WriteAll(dir string, dashboard models.Dashboard, details []models.JobDetail
 		}
 	}
 	if err := WriteFlakinessReport(dir, flakiness); err != nil {
+		return err
+	}
+	if err := WriteSearchIndex(dir, searchIndex); err != nil {
 		return err
 	}
 	return nil

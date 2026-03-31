@@ -155,13 +155,17 @@ func run() error {
 	log.Printf("Flakiness report: %d most flaky, %d persistent, %d recently broken",
 		len(flakinessReport.MostFlaky), len(flakinessReport.PersistentFailures), len(flakinessReport.RecentlyBroken))
 
+	// Step 4b: Build search index.
+	searchIndex := aggregator.BuildSearchIndex(jobResultMap, jobs, now)
+	log.Printf("Search index: %d entries", len(searchIndex.Entries))
+
 	// Step 5: AI failure analysis (optional).
 	if *enableAI {
 		analyzeFailuresWithAI(ctx, details, flakinessReport, aiToken, *outDir)
 	}
 
 	log.Printf("Writing output to %s/ (%d jobs)", *outDir, len(dashboard.Jobs))
-	if err := output.WriteAll(*outDir, dashboard, details, flakinessReport); err != nil {
+	if err := output.WriteAll(*outDir, dashboard, details, flakinessReport, searchIndex); err != nil {
 		return fmt.Errorf("writing output: %w", err)
 	}
 

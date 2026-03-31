@@ -99,7 +99,7 @@ export function TestCaseTable({ testCases, jobName, buildLogUrl }: TestCaseTable
             <th className="px-3 py-2.5 text-left font-label text-xs uppercase tracking-wider text-on-surface-variant">
               Test Name
             </th>
-            <th className="w-24 px-3 py-2.5 text-right font-label text-xs uppercase tracking-wider text-on-surface-variant">
+            <th className="w-24 px-3 py-2.5 text-right font-label text-xs uppercase tracking-wider text-on-surface-variant hidden sm:table-cell">
               Duration
             </th>
           </tr>
@@ -128,10 +128,10 @@ export function TestCaseTable({ testCases, jobName, buildLogUrl }: TestCaseTable
                     }}
                     className={`flex items-center ${stripe} ${hasFail ? "cursor-pointer hover:brightness-110" : ""}`}
                   >
-                    <span className="w-10 shrink-0 px-3 py-2">
+                    <span className="w-10 shrink-0 px-2 sm:px-3 py-2">
                       {statusIcon(tc.status)}
                     </span>
-                    <span className="min-w-0 flex-1 break-words px-3 py-2 text-on-surface">
+                    <span className="min-w-0 flex-1 break-words px-2 sm:px-3 py-2 text-on-surface">
                       {jobName && tc.status === "failed" ? (
                         <Link
                           to={`/job/${encodeURIComponent(jobName)}/test/${encodeURIComponent(tc.name)}`}
@@ -168,14 +168,14 @@ export function TestCaseTable({ testCases, jobName, buildLogUrl }: TestCaseTable
                         </a>
                       )}
                     </span>
-                    <span className="w-24 shrink-0 px-3 py-2 text-right font-label text-xs text-on-surface-variant">
+                    <span className="w-24 shrink-0 px-2 sm:px-3 py-2 text-right font-label text-xs text-on-surface-variant hidden sm:block">
                       {formatDuration(tc.duration_seconds)}
                     </span>
                   </div>
 
                   {/* AI summary — shown inline for failed tests without expanding */}
                   {tc.ai_summary && (
-                    <div className={`flex items-start gap-2 pl-16 pr-6 py-1.5 ${stripe}`}>
+                    <div className={`flex items-start gap-2 pl-10 sm:pl-16 pr-4 sm:pr-6 py-1.5 ${stripe}`}>
                       <HiSparkles className="h-4 w-4 shrink-0 text-primary" />
                       <span className={`text-xs ${tc.ai_summary.is_transient ? "text-on-surface-variant" : "text-tertiary"}`}>
                         {tc.ai_summary.summary}

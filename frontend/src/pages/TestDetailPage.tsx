@@ -236,7 +236,7 @@ export function TestDetailPage() {
   const selectedRun = selectedOccurrence?.run ?? null;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {/* Breadcrumb */}
       <nav className="font-label flex items-center gap-2 text-sm text-on-surface-variant">
         <Link to="/" className="transition-colors hover:text-primary">
@@ -257,7 +257,7 @@ export function TestDetailPage() {
 
       {/* Test header */}
       <div>
-        <h1 className="font-headline text-2xl font-bold text-on-surface break-all">
+        <h1 className="font-headline text-xl sm:text-2xl font-bold text-on-surface break-all">
           {testName}
         </h1>
         <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -343,7 +343,7 @@ export function TestDetailPage() {
 
       {/* Selected failure detail */}
       {selectedRun && selectedTc && (
-        <section className="glass rounded-xl p-6 space-y-5">
+        <section className="glass rounded-xl p-4 sm:p-6 space-y-5">
           <div className="flex items-center gap-3">
             <h3 className="font-headline text-base font-semibold text-on-surface">
               Run Detail
@@ -532,7 +532,7 @@ export function TestDetailPage() {
 
           {/* AI analysis panel */}
           {selectedTc.ai_analysis && (
-            <div className="rounded-lg border border-primary/30 bg-primary/5 p-5 space-y-4">
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 sm:p-5 space-y-4">
               <div className="flex items-center gap-2">
                 <HiSparkles className="h-5 w-5 text-primary" />
                 <span className="font-label text-sm font-semibold text-primary">

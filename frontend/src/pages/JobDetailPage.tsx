@@ -92,7 +92,7 @@ export function JobDetailPage() {
   const lastRun = runs[0] ?? null;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {/* Breadcrumb */}
       <nav className="font-label flex items-center gap-2 text-sm text-on-surface-variant">
         <Link to="/" className="transition-colors hover:text-primary">
@@ -104,7 +104,7 @@ export function JobDetailPage() {
 
       {/* Job header */}
       <div>
-        <h1 className="font-headline text-2xl font-bold text-on-surface">
+        <h1 className="font-headline text-xl sm:text-2xl font-bold text-on-surface">
           {jobName}
         </h1>
         <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -173,7 +173,7 @@ export function JobDetailPage() {
 
           {/* Selected run details */}
           {selectedRun && (
-            <section className="glass rounded-xl p-6">
+            <section className="glass rounded-xl p-4 sm:p-6">
               <div className="mb-4 flex items-center gap-3">
                 <h3 className="font-headline text-base font-semibold text-on-surface">
                   Run Details

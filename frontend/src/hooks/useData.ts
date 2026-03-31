@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import type { Dashboard, FlakinessReport, JobDetail } from "../types/dashboard";
+import type { Dashboard, FlakinessReport, JobDetail, SearchIndex } from "../types/dashboard";
 
 const DATA_BASE =
   import.meta.env.VITE_DATA_URL ?? `${import.meta.env.BASE_URL}data`;
@@ -59,6 +59,25 @@ export function useJobDetail(jobName: string | undefined) {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [jobName]);
+
+  return { data, loading, error };
+}
+
+export function useSearchIndex() {
+  const [data, setData] = useState<SearchIndex | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`${DATA_BASE}/search-index.json`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then(setData)
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
 
   return { data, loading, error };
 }

@@ -143,7 +143,7 @@ func TestWriteAll(t *testing.T) {
 		GeneratedAt: "2025-01-15T12:00:00Z",
 	}
 
-	if err := WriteAll(dir, dash, details, flakiness); err != nil {
+	if err := WriteAll(dir, dash, details, flakiness, models.SearchIndex{GeneratedAt: "2025-01-15T12:00:00Z"}); err != nil {
 		t.Fatalf("WriteAll: %v", err)
 	}
 
@@ -161,5 +161,9 @@ func TestWriteAll(t *testing.T) {
 	// flakiness.json exists
 	if _, err := os.Stat(filepath.Join(dir, "flakiness.json")); err != nil {
 		t.Error("flakiness.json missing")
+	}
+	// search-index.json exists
+	if _, err := os.Stat(filepath.Join(dir, "search-index.json")); err != nil {
+		t.Error("search-index.json missing")
 	}
 }
