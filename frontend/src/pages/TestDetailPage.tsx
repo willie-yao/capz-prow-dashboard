@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useJobDetail } from "../hooks/useData";
 import { formatDuration, timeAgo, fileToUrl, fileSortKey, formatSteps } from "../lib/utils";
 import { DurationChart } from "../components/DurationChart";
@@ -69,7 +69,10 @@ export function TestDetailPage() {
   }>();
   const testName = encodedTestName ? decodeURIComponent(encodedTestName) : "";
   const { data, loading, error } = useJobDetail(jobName);
-  const [selectedBuildId, setSelectedBuildId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const [selectedBuildId, setSelectedBuildId] = useState<string | null>(
+    searchParams.get("run")
+  );
 
   // Build per-run test occurrences (oldest first for timeline)
   const occurrences: TestOccurrence[] = useMemo(() => {
@@ -244,7 +247,7 @@ export function TestDetailPage() {
         </Link>
         <span>›</span>
         <Link
-          to={`/job/${encodeURIComponent(jobName ?? "")}`}
+          to={`/job/${encodeURIComponent(jobName ?? "")}${effectiveSelectedId ? `?run=${effectiveSelectedId}` : ""}`}
           className="transition-colors hover:text-primary"
         >
           {jobName}

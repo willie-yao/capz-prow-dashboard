@@ -266,7 +266,7 @@ export function JobDetailPage() {
               <h2 className="font-headline mb-3 text-lg font-semibold text-on-surface">
                 Test Cases
               </h2>
-              <TestCaseTable testCases={testCases} jobName={jobName} buildLogUrl={selectedRun?.build_log_url} />
+              <TestCaseTable testCases={testCases} jobName={jobName} buildId={selectedRun?.build_id} buildLogUrl={selectedRun?.build_log_url} />
             </section>
           )}
 

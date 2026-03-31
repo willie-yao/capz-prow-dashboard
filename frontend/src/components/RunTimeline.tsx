@@ -33,7 +33,7 @@ export function RunTimeline({
       <div className="flex items-start gap-2 p-1">
         {sorted.map((run, i) => {
           const isSelected = run.build_id === selectedBuildId;
-          const showDate = i % 5 === 0 || i === sorted.length - 1;
+          const showDate = sorted.length <= 10 || i % 5 === 0 || i === sorted.length - 1;
           const color = colorFn ? colorFn(run) : dotColor(run.passed, run.result);
           const tooltip = tooltipFn ? tooltipFn(run) : `#${run.build_id} — ${run.passed ? "Passed" : "Failed"}`;
 

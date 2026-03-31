@@ -26,7 +26,22 @@ export function DashboardPage() {
   const branches = useMemo(() => {
     if (!data) return [];
     const set = new Set(data.jobs.map((j) => j.branch).filter(Boolean));
-    return Array.from(set).sort();
+    return Array.from(set).sort((a, b) => {
+      // "main" always first
+      if (a === "main") return -1;
+      if (b === "main") return 1;
+      // Release branches: sort descending (newest first)
+      // Extract version numbers for proper numeric comparison
+      const aMatch = a.match(/(\d+)\.(\d+)/);
+      const bMatch = b.match(/(\d+)\.(\d+)/);
+      if (aMatch && bMatch) {
+        const aMajor = Number(aMatch[1]), aMinor = Number(aMatch[2]);
+        const bMajor = Number(bMatch[1]), bMinor = Number(bMatch[2]);
+        if (aMajor !== bMajor) return bMajor - aMajor;
+        return bMinor - aMinor;
+      }
+      return a.localeCompare(b);
+    });
   }, [data]);
 
   const filtered = useMemo(() => {

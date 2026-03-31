@@ -6,6 +6,7 @@ import { formatDuration, fileToUrl, fileSortKey, formatSteps } from "../lib/util
 interface TestCaseTableProps {
   testCases: TestCase[];
   jobName?: string;
+  buildId?: string;
   buildLogUrl?: string;
 }
 
@@ -68,7 +69,7 @@ function highlightStackTrace(body: string): (string | React.ReactElement)[] {
   return parts;
 }
 
-export function TestCaseTable({ testCases, jobName, buildLogUrl }: TestCaseTableProps) {
+export function TestCaseTable({ testCases, jobName, buildId, buildLogUrl }: TestCaseTableProps) {
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
 
   const filtered = testCases.filter(
@@ -134,7 +135,7 @@ export function TestCaseTable({ testCases, jobName, buildLogUrl }: TestCaseTable
                     <span className="min-w-0 flex-1 break-words px-2 sm:px-3 py-2 text-on-surface">
                       {jobName && tc.status === "failed" ? (
                         <Link
-                          to={`/job/${encodeURIComponent(jobName)}/test/${encodeURIComponent(tc.name)}`}
+                          to={`/job/${encodeURIComponent(jobName)}/test/${encodeURIComponent(tc.name)}${buildId ? `?run=${buildId}` : ""}`}
                           className="hover:text-primary transition-colors"
                           onClick={(e) => e.stopPropagation()}
                         >

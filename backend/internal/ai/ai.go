@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -237,20 +238,23 @@ func (c *Client) ComprehensiveAnalysis(ctx context.Context, evidence Evidence) (
 	fmt.Fprintf(&sb, "Error: %s\n", evidence.FailureMessage)
 
 	if evidence.FailureBody != "" {
-		fmt.Fprintf(&sb, "\nStack trace:\n%s\n", truncate(evidence.FailureBody, 1000))
+		fmt.Fprintf(&sb, "\nStack trace:\n%s\n", truncate(evidence.FailureBody, 2000))
 	}
 
 	if evidence.BuildLogErrors != "" {
 		fmt.Fprintf(&sb, "\n=== Build Log Errors ===\n%s\n", evidence.BuildLogErrors)
 	}
-	if evidence.MachineYAMLs != "" {
-		fmt.Fprintf(&sb, "\n=== Machine Status (CAPI) ===\n%s\n", evidence.MachineYAMLs)
-	}
-	if evidence.AzureMachineYAMLs != "" {
-		fmt.Fprintf(&sb, "\n=== AzureMachine Status ===\n%s\n", evidence.AzureMachineYAMLs)
-	}
-	if evidence.KCPStatus != "" {
-		fmt.Fprintf(&sb, "\n=== KubeadmControlPlane Status ===\n%s\n", evidence.KCPStatus)
+	// Add all resource YAMLs dynamically
+	if len(evidence.ResourceYAMLs) > 0 {
+		// Sort keys for deterministic output
+		var resourceTypes []string
+		for k := range evidence.ResourceYAMLs {
+			resourceTypes = append(resourceTypes, k)
+		}
+		sort.Strings(resourceTypes)
+		for _, rt := range resourceTypes {
+			fmt.Fprintf(&sb, "\n=== %s Status ===\n%s\n", rt, evidence.ResourceYAMLs[rt])
+		}
 	}
 	if evidence.CloudInitLog != "" {
 		fmt.Fprintf(&sb, "\n=== Cloud-Init Log ===\n%s\n", evidence.CloudInitLog)
@@ -261,15 +265,22 @@ func (c *Client) ComprehensiveAnalysis(ctx context.Context, evidence Evidence) (
 	if evidence.KubeletLog != "" {
 		fmt.Fprintf(&sb, "\n=== Kubelet Log ===\n%s\n", evidence.KubeletLog)
 	}
+	if evidence.ContainerdLog != "" {
+		fmt.Fprintf(&sb, "\n=== Containerd Log ===\n%s\n", evidence.ContainerdLog)
+	}
+	if evidence.JournalLog != "" {
+		fmt.Fprintf(&sb, "\n=== Journal Log ===\n%s\n", evidence.JournalLog)
+	}
 	if evidence.AzureActivityLog != "" {
 		fmt.Fprintf(&sb, "\n=== Azure Activity Log ===\n%s\n", evidence.AzureActivityLog)
 	}
 
-	sb.WriteString("\nBased on the evidence above, provide:\n")
-	sb.WriteString("1. ROOT CAUSE: State the specific error you found in the artifacts. Quote the actual error message or status field. Do NOT give generic possibilities — tell me exactly what went wrong based on what you see.\n")
-	sb.WriteString("2. SUGGESTED FIX: Based on the root cause you identified, give the specific fix. Do NOT say 'check the logs' — you already have the logs. Instead say what needs to change and where.\n")
-	sb.WriteString("3. If artifacts are missing or incomplete, say what you COULD determine and what remains unknown.\n\n")
-	sb.WriteString(`Respond in JSON: {"root_cause": "the specific error found in the evidence", "severity": "Critical/High/Medium/Low", "suggested_fix": "the specific fix based on what you found", "relevant_files": ["file1.go", "file2.yaml"]}`)
+	sb.WriteString("\nYou have been given ALL available artifacts for this failure. Perform a complete investigation:\n")
+	sb.WriteString("1. ROOT CAUSE: Find the specific error in the artifacts above. Quote the actual error message, status condition, or log line that reveals the failure. Do NOT speculate — cite what you found.\n")
+	sb.WriteString("2. TRACE THE CHAIN: Follow the dependency chain (VM provisioning → cloud-init → kubeadm → kubelet → CNI → CCM → providerID). Identify which step failed and why.\n")
+	sb.WriteString("3. SUGGESTED FIX: Based on the root cause you identified, give the specific fix. Say exactly what file/config/setting needs to change and how. Do NOT say 'check the logs' — you already have them.\n")
+	sb.WriteString("4. If artifacts show the cause clearly, state it with confidence. If evidence is incomplete, say what you determined and what remains unknown.\n\n")
+	sb.WriteString(`Respond in JSON: {"root_cause": "the specific error found in evidence with quoted log lines", "severity": "Critical/High/Medium/Low", "suggested_fix": "exact fix with file paths and changes needed", "relevant_files": ["file1.go", "file2.yaml"]}`)
 
 	resp, err := c.callAPI(ctx, DeepModel, systemPrompt, sb.String())
 	if err != nil {

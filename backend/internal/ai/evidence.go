@@ -24,14 +24,14 @@ type Evidence struct {
 	ConsecutiveCount int
 
 	// Artifact content (fetched from GCS)
-	BuildLogErrors    string // Filtered error/failure lines from build log
-	MachineYAMLs      string // Machine objects with status fields
-	AzureMachineYAMLs string // AzureMachine objects with provisioning status
-	KCPStatus         string // KubeadmControlPlane status
-	CloudInitLog      string // cloud-init-output.log content
-	BootLog           string // boot.log content
-	KubeletLog        string // kubelet.log excerpt
-	AzureActivityLog  string // Azure activity log excerpt
+	BuildLogErrors   string            // Filtered error/failure lines from build log
+	ResourceYAMLs    map[string]string // All CAPI resource status YAMLs keyed by resource type
+	CloudInitLog     string            // cloud-init-output.log content
+	BootLog          string            // boot.log content
+	KubeletLog       string            // kubelet.log excerpt
+	AzureActivityLog string            // Azure activity log excerpt
+	ContainerdLog    string            // containerd.log excerpt
+	JournalLog       string            // journal.log excerpt
 }
 
 // EvidenceParams provides the URLs and metadata needed to collect evidence.
@@ -76,25 +76,47 @@ func CollectEvidence(ctx context.Context, client *http.Client, params EvidencePa
 		ConsecutiveCount: params.ConsecutiveCount,
 	}
 
-	// 1. Build log errors
+	// 1. Build log errors — increase to 6000 chars
 	if params.BuildLogURL != "" {
 		ev.BuildLogErrors = collectBuildLogErrors(ctx, client, params.BuildLogURL)
 	}
 
-	// 2. Bootstrap resource YAMLs
+	// 2. Bootstrap resource YAMLs — discover ALL resource types and fetch status from each
 	if params.BootstrapResourcesURL != "" {
-		ev.MachineYAMLs = collectResourceStatus(ctx, client, params.BootstrapResourcesURL+"Machine/", 2000)
-		ev.AzureMachineYAMLs = collectResourceStatus(ctx, client, params.BootstrapResourcesURL+"AzureMachine/", 2000)
-		ev.KCPStatus = collectResourceStatus(ctx, client, params.BootstrapResourcesURL+"KubeadmControlPlane/", 1500)
+		ev.ResourceYAMLs = collectAllResources(ctx, client, params.BootstrapResourcesURL)
 	}
 
-	// 3. Machine logs
-	if params.ClusterArtifacts != nil && len(params.ClusterArtifacts.Machines) > 0 {
-		ev.BootLog, ev.CloudInitLog = collectBootLogs(ctx, client, params.ClusterArtifacts.Machines[0])
-		ev.KubeletLog = collectKubeletLog(ctx, client, params.ClusterArtifacts.Machines[0])
+	// 3. Machine logs — fetch from ALL machines (not just the first), with larger limits
+	if params.ClusterArtifacts != nil {
+		for _, machine := range params.ClusterArtifacts.Machines {
+			boot, cloudInit := collectBootLogs(ctx, client, machine)
+			if ev.BootLog == "" {
+				ev.BootLog = boot
+			}
+			if ev.CloudInitLog == "" {
+				ev.CloudInitLog = cloudInit
+			}
+			if ev.KubeletLog == "" {
+				ev.KubeletLog = collectKubeletLog(ctx, client, machine)
+			}
+			if ev.ContainerdLog == "" {
+				if url, ok := machine.Logs["containerd.log"]; ok && url != "" {
+					ev.ContainerdLog = fetchLogTail(ctx, client, url, 100, 3000)
+				}
+			}
+			if ev.JournalLog == "" {
+				if url, ok := machine.Logs["journal.log"]; ok && url != "" {
+					ev.JournalLog = fetchLogTail(ctx, client, url, 150, 4000)
+				}
+			}
+			// Stop after finding content from any machine
+			if ev.BootLog != "" || ev.CloudInitLog != "" || ev.KubeletLog != "" {
+				break
+			}
+		}
 	}
 
-	// 4. Azure activity log
+	// 4. Azure activity log — larger limit
 	if params.ClusterArtifacts != nil && params.ClusterArtifacts.AzureActivityLog != "" {
 		ev.AzureActivityLog = collectActivityLog(ctx, client, params.ClusterArtifacts.AzureActivityLog)
 	}
@@ -165,16 +187,99 @@ func collectBuildLogErrors(ctx context.Context, client *http.Client, url string)
 		sb.WriteByte('\n')
 		prevIdx = i
 
-		if sb.Len() > 3000 {
+		if sb.Len() > 6000 {
 			break
 		}
 	}
 
 	result := sb.String()
-	if len(result) > 3000 {
-		result = result[:3000] + "..."
+	if len(result) > 6000 {
+		result = result[:6000] + "..."
 	}
 	return result
+}
+
+// collectAllResources discovers all resource type directories in the bootstrap
+// resources namespace and fetches status YAMLs from each.
+func collectAllResources(ctx context.Context, client *http.Client, baseURL string) map[string]string {
+	// List resource type directories (Machine/, AzureMachine/, MachinePool/, AzureMachinePool/, etc.)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL, nil)
+	if err != nil {
+		return nil
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("  ⚠ Evidence: failed to list resource types at %s: %v", baseURL, err)
+		return nil
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil
+	}
+
+	dirs, err := parseResourceDirs(resp.Body)
+	if err != nil {
+		return nil
+	}
+
+	results := make(map[string]string)
+	totalChars := 0
+	const maxTotalChars = 30000 // total budget across all resource types
+
+	for _, dir := range dirs {
+		if totalChars > maxTotalChars {
+			break
+		}
+		remaining := maxTotalChars - totalChars
+		if remaining < 1000 {
+			break
+		}
+		maxPerType := 4000
+		if remaining < maxPerType {
+			maxPerType = remaining
+		}
+
+		content := collectResourceStatus(ctx, client, baseURL+dir+"/", maxPerType)
+		if content != "" {
+			results[dir] = content
+			totalChars += len(content)
+		}
+	}
+
+	return results
+}
+
+// parseResourceDirs extracts directory names from a GCSweb HTML listing,
+// filtering out the ".." back link.
+func parseResourceDirs(r io.Reader) ([]string, error) {
+	doc, err := html.Parse(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var dirs []string
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "a" {
+			for _, attr := range n.Attr {
+				if attr.Key == "href" && strings.HasSuffix(attr.Val, "/") {
+					name := attr.Val
+					name = strings.TrimSuffix(name, "/")
+					if idx := strings.LastIndex(name, "/"); idx >= 0 {
+						name = name[idx+1:]
+					}
+					if name != "" && name != ".." {
+						dirs = append(dirs, name)
+					}
+				}
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+		}
+	}
+	walk(doc)
+	return dirs, nil
 }
 
 // collectResourceStatus fetches a GCSweb resource directory listing, downloads each
@@ -298,34 +403,34 @@ func extractYAMLStatus(yamlContent string) string {
 	return strings.TrimSpace(sb.String())
 }
 
-// collectBootLogs fetches boot.log and/or cloud-init-output.log from the first machine.
-// Returns (bootLog, cloudInitLog). Takes last 150 lines, capped at 3000 chars.
+// collectBootLogs fetches boot.log and/or cloud-init-output.log from a machine.
+// Returns (bootLog, cloudInitLog). Takes last 300 lines, capped at 6000 chars.
 func collectBootLogs(ctx context.Context, client *http.Client, machine models.MachineArtifacts) (string, string) {
 	var bootLog, cloudInitLog string
 
 	if url, ok := machine.Logs["boot.log"]; ok && url != "" {
-		bootLog = fetchLogTail(ctx, client, url, 150, 3000)
+		bootLog = fetchLogTail(ctx, client, url, 300, 6000)
 	}
 
 	if url, ok := machine.Logs["cloud-init-output.log"]; ok && url != "" {
-		cloudInitLog = fetchLogTail(ctx, client, url, 150, 3000)
+		cloudInitLog = fetchLogTail(ctx, client, url, 300, 6000)
 	}
 
 	return bootLog, cloudInitLog
 }
 
-// collectKubeletLog fetches kubelet.log from a machine. Takes last 100 lines, capped at 2000 chars.
+// collectKubeletLog fetches kubelet.log from a machine. Takes last 200 lines, capped at 4000 chars.
 func collectKubeletLog(ctx context.Context, client *http.Client, machine models.MachineArtifacts) string {
 	url, ok := machine.Logs["kubelet.log"]
 	if !ok || url == "" {
 		return ""
 	}
-	return fetchLogTail(ctx, client, url, 100, 2000)
+	return fetchLogTail(ctx, client, url, 200, 4000)
 }
 
-// collectActivityLog fetches the Azure activity log. Takes last 100 lines, capped at 2000 chars.
+// collectActivityLog fetches the Azure activity log. Takes last 200 lines, capped at 4000 chars.
 func collectActivityLog(ctx context.Context, client *http.Client, url string) string {
-	return fetchLogTail(ctx, client, url, 100, 2000)
+	return fetchLogTail(ctx, client, url, 200, 4000)
 }
 
 // fetchLogTail fetches a log file and returns the last N lines, capped at maxChars.
