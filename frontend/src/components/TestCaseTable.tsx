@@ -266,6 +266,16 @@ export function TestCaseTable({ testCases, jobName, buildId, buildLogUrl }: Test
                                 <HiArchiveBox className="h-3.5 w-3.5 shrink-0" /> {dir}
                               </a>
                             ))}
+                            {jobName && buildId && (
+                              <a
+                                href={`https://gcsweb.k8s.io/gcs/kubernetes-ci-logs/logs/${jobName}/${buildId}/artifacts/clusters/bootstrap/logs/`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-primary hover:underline"
+                              >
+                                <HiServerStack className="h-3.5 w-3.5 shrink-0" /> Controller Logs
+                              </a>
+                            )}
                           </div>
 
                           {tc.cluster_artifacts.machines && tc.cluster_artifacts.machines.length > 0 && (
@@ -314,7 +324,7 @@ export function TestCaseTable({ testCases, jobName, buildId, buildLogUrl }: Test
                                   ? "bg-tertiary/20 text-tertiary"
                                   : "bg-on-surface-variant/20 text-on-surface-variant"
                             }`}>
-                              {tc.ai_analysis.severity}
+                              Severity: {tc.ai_analysis.severity}
                             </span>
                           </div>
                           <div>

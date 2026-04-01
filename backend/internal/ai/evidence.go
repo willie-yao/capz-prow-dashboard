@@ -25,6 +25,7 @@ type Evidence struct {
 
 	// Artifact content (fetched from GCS)
 	BuildLogErrors   string            // Filtered error/failure lines from build log
+	BuildLogTail     string            // Last 200 lines of build log (raw, unfiltered)
 	ResourceYAMLs    map[string]string // All CAPI resource status YAMLs keyed by resource type
 	CloudInitLog     string            // cloud-init-output.log content
 	BootLog          string            // boot.log content
@@ -56,8 +57,11 @@ var buildLogPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)unknown flag`),
 	regexp.MustCompile(`(?i)quota|OperationNotAllowed`),
 	regexp.MustCompile(`(?i)SkuNotAvailable`),
-	regexp.MustCompile(`(?i)not found|no image`),
+	regexp.MustCompile(`(?i)not found|no image|NotFound`),
 	regexp.MustCompile(`(?i)FailureMessage|FailureReason`),
+	regexp.MustCompile(`(?i)GalleryImage|CommunityGaller`),
+	regexp.MustCompile(`(?i)version.*not.*available|not.*replicated`),
+	regexp.MustCompile(`(?i)provisioningState.*Failed`),
 }
 
 // errorRe matches "error" but we skip lines containing "no error" in the matching logic.
@@ -76,9 +80,10 @@ func CollectEvidence(ctx context.Context, client *http.Client, params EvidencePa
 		ConsecutiveCount: params.ConsecutiveCount,
 	}
 
-	// 1. Build log errors — increase to 6000 chars
+	// 1. Build log — extract error patterns AND raw tail
 	if params.BuildLogURL != "" {
 		ev.BuildLogErrors = collectBuildLogErrors(ctx, client, params.BuildLogURL)
+		ev.BuildLogTail = fetchLogTail(ctx, client, params.BuildLogURL, 500, 15000)
 	}
 
 	// 2. Bootstrap resource YAMLs — discover ALL resource types and fetch status from each
@@ -101,12 +106,12 @@ func CollectEvidence(ctx context.Context, client *http.Client, params EvidencePa
 			}
 			if ev.ContainerdLog == "" {
 				if url, ok := machine.Logs["containerd.log"]; ok && url != "" {
-					ev.ContainerdLog = fetchLogTail(ctx, client, url, 100, 3000)
+					ev.ContainerdLog = fetchLogTail(ctx, client, url, 300, 8000)
 				}
 			}
 			if ev.JournalLog == "" {
 				if url, ok := machine.Logs["journal.log"]; ok && url != "" {
-					ev.JournalLog = fetchLogTail(ctx, client, url, 150, 4000)
+					ev.JournalLog = fetchLogTail(ctx, client, url, 400, 10000)
 				}
 			}
 			// Stop after finding content from any machine
@@ -187,14 +192,14 @@ func collectBuildLogErrors(ctx context.Context, client *http.Client, url string)
 		sb.WriteByte('\n')
 		prevIdx = i
 
-		if sb.Len() > 6000 {
+		if sb.Len() > 15000 {
 			break
 		}
 	}
 
 	result := sb.String()
-	if len(result) > 6000 {
-		result = result[:6000] + "..."
+	if len(result) > 15000 {
+		result = result[:15000] + "..."
 	}
 	return result
 }
@@ -224,7 +229,7 @@ func collectAllResources(ctx context.Context, client *http.Client, baseURL strin
 
 	results := make(map[string]string)
 	totalChars := 0
-	const maxTotalChars = 30000 // total budget across all resource types
+	const maxTotalChars = 60000 // total budget across all resource types
 
 	for _, dir := range dirs {
 		if totalChars > maxTotalChars {
@@ -234,7 +239,7 @@ func collectAllResources(ctx context.Context, client *http.Client, baseURL strin
 		if remaining < 1000 {
 			break
 		}
-		maxPerType := 4000
+		maxPerType := 8000
 		if remaining < maxPerType {
 			maxPerType = remaining
 		}
@@ -409,11 +414,11 @@ func collectBootLogs(ctx context.Context, client *http.Client, machine models.Ma
 	var bootLog, cloudInitLog string
 
 	if url, ok := machine.Logs["boot.log"]; ok && url != "" {
-		bootLog = fetchLogTail(ctx, client, url, 300, 6000)
+		bootLog = fetchLogTail(ctx, client, url, 500, 15000)
 	}
 
 	if url, ok := machine.Logs["cloud-init-output.log"]; ok && url != "" {
-		cloudInitLog = fetchLogTail(ctx, client, url, 300, 6000)
+		cloudInitLog = fetchLogTail(ctx, client, url, 500, 15000)
 	}
 
 	return bootLog, cloudInitLog
@@ -425,12 +430,12 @@ func collectKubeletLog(ctx context.Context, client *http.Client, machine models.
 	if !ok || url == "" {
 		return ""
 	}
-	return fetchLogTail(ctx, client, url, 200, 4000)
+	return fetchLogTail(ctx, client, url, 400, 10000)
 }
 
 // collectActivityLog fetches the Azure activity log. Takes last 200 lines, capped at 4000 chars.
 func collectActivityLog(ctx context.Context, client *http.Client, url string) string {
-	return fetchLogTail(ctx, client, url, 200, 4000)
+	return fetchLogTail(ctx, client, url, 400, 10000)
 }
 
 // fetchLogTail fetches a log file and returns the last N lines, capped at maxChars.

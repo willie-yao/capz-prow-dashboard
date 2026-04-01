@@ -234,9 +234,9 @@ export function TestDetailPage() {
     );
   }
 
-  const latestStatus = latestOccurrence?.testCase?.status ?? "skipped";
   const selectedTc = selectedOccurrence?.testCase ?? null;
   const selectedRun = selectedOccurrence?.run ?? null;
+  const displayStatus = selectedTc?.status ?? latestOccurrence?.testCase?.status ?? "skipped";
 
   return (
     <div className="space-y-6 sm:space-y-8">
@@ -266,14 +266,14 @@ export function TestDetailPage() {
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <span
             className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-              latestStatus === "passed"
+              displayStatus === "passed"
                 ? "bg-secondary/20 text-secondary"
-                : latestStatus === "failed"
+                : displayStatus === "failed"
                   ? "bg-error/20 text-error"
                   : "bg-on-surface-variant/20 text-on-surface-variant"
             }`}
           >
-            {latestStatus.charAt(0).toUpperCase() + latestStatus.slice(1)}
+            {displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
           </span>
           {classification && (
             <span
@@ -496,6 +496,16 @@ export function TestDetailPage() {
                     <HiArchiveBox className="h-3.5 w-3.5 shrink-0" /> {dir}
                   </a>
                 ))}
+                {selectedRun && (
+                  <a
+                    href={`https://gcsweb.k8s.io/gcs/kubernetes-ci-logs/logs/${selectedRun.job_name}/${selectedRun.build_id}/artifacts/clusters/bootstrap/logs/`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    <HiServerStack className="h-3.5 w-3.5 shrink-0" /> Controller Logs
+                  </a>
+                )}
               </div>
 
               {selectedTc.cluster_artifacts.machines &&
@@ -548,7 +558,7 @@ export function TestDetailPage() {
                       ? "bg-tertiary/20 text-tertiary"
                       : "bg-on-surface-variant/20 text-on-surface-variant"
                 }`}>
-                  {selectedTc.ai_analysis.severity}
+                  Severity: {selectedTc.ai_analysis.severity}
                 </span>
               </div>
               <div>

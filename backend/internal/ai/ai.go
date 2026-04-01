@@ -175,13 +175,13 @@ func (c *Client) DeepAnalysis(ctx context.Context, testName string, consecutiveF
 	fmt.Fprintf(&sb, "Analyze this persistent CAPZ E2E test failure (failed %d consecutive times).\n\n", consecutiveFailures)
 	fmt.Fprintf(&sb, "Test: %s\nError: %s\n", testName, failureMessage)
 	if failureBody != "" {
-		fmt.Fprintf(&sb, "\nFailure details:\n%s\n", truncate(failureBody, 2000))
+		fmt.Fprintf(&sb, "\nFailure details:\n%s\n", truncate(failureBody, 5000))
 	}
 	if buildLogTail != "" {
-		fmt.Fprintf(&sb, "\nBuild log (last lines):\n%s\n", truncate(buildLogTail, 2000))
+		fmt.Fprintf(&sb, "\nBuild log (last lines):\n%s\n", truncate(buildLogTail, 5000))
 	}
 	if activityLogExcerpt != "" {
-		fmt.Fprintf(&sb, "\nAzure activity log excerpt:\n%s\n", truncate(activityLogExcerpt, 1000))
+		fmt.Fprintf(&sb, "\nAzure activity log excerpt:\n%s\n", truncate(activityLogExcerpt, 3000))
 	}
 	sb.WriteString("\nRespond in JSON with fields: root_cause, severity, suggested_fix, relevant_files")
 
@@ -238,11 +238,14 @@ func (c *Client) ComprehensiveAnalysis(ctx context.Context, evidence Evidence) (
 	fmt.Fprintf(&sb, "Error: %s\n", evidence.FailureMessage)
 
 	if evidence.FailureBody != "" {
-		fmt.Fprintf(&sb, "\nStack trace:\n%s\n", truncate(evidence.FailureBody, 2000))
+		fmt.Fprintf(&sb, "\nStack trace:\n%s\n", truncate(evidence.FailureBody, 5000))
 	}
 
 	if evidence.BuildLogErrors != "" {
 		fmt.Fprintf(&sb, "\n=== Build Log Errors ===\n%s\n", evidence.BuildLogErrors)
+	}
+	if evidence.BuildLogTail != "" {
+		fmt.Fprintf(&sb, "\n=== Build Log (last 200 lines) ===\n%s\n", evidence.BuildLogTail)
 	}
 	// Add all resource YAMLs dynamically
 	if len(evidence.ResourceYAMLs) > 0 {

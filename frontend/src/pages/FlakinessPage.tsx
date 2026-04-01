@@ -72,7 +72,7 @@ function TestRow({ item, tab }: { item: TestFlakiness; tab: Tab }) {
           {/* Test Name */}
           <div className="min-w-0 flex-1">
             <Link
-              to={`/job/${encodeURIComponent(item.job_name)}/test/${encodeURIComponent(item.test_name)}`}
+              to={`/job/${encodeURIComponent(item.job_name)}/test/${encodeURIComponent(item.test_name)}${item.last_failure?.build_id ? `?run=${item.last_failure.build_id}` : ""}`}
               onClick={(e) => e.stopPropagation()}
               className="block truncate text-sm font-medium text-on-surface hover:text-primary transition-colors"
               title={item.test_name}
