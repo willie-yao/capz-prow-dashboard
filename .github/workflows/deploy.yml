@@ -49,7 +49,7 @@ jobs:
           AI_TOKEN: ${{ secrets.AI_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        run: ./fetcher -builds=8 -workers=5 -out=frontend/public/data -timeout=10m -ai
+        run: ./fetcher -builds=8 -workers=5 -out=frontend/public/data -timeout=30m -ai
 
       # Save data cache (job JSON + AI cache) for future runs
       - name: Save data cache

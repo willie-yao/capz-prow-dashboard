@@ -44,7 +44,7 @@ fetch-data-quick: build
 
 # Fetch data with AI analysis (requires AI_TOKEN env var)
 fetch-data-ai: build
-	./bin/fetcher -builds=8 -workers=5 -out=frontend/public/data -timeout=10m -ai
+	./bin/fetcher -builds=8 -workers=5 -out=frontend/public/data -timeout=30m -ai
 
 # Fetch minimal data with AI analysis
 fetch-data-ai-quick: build
