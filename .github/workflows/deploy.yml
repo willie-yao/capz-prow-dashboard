@@ -1,12 +1,11 @@
-name: Deploy Dashboard
+name: Publish redirect page
 
+# Publishes a static index.html that redirects visitors to the new
+# capz-prow-ai-dashboard site. The data fetcher + dashboard build that
+# used to run here have moved to:
+# https://github.com/willie-yao/capz-prow-ai-dashboard
 on:
-  schedule:
-    # Run every 30 minutes
-    - cron: "*/30 * * * *"
   workflow_dispatch: {}
-  push:
-    branches: [main]
 
 permissions:
   contents: read
@@ -18,69 +17,43 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  publish-redirect:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Generate redirect page
+        run: |
+          mkdir -p site
+          cat > site/index.html <<'EOF'
+          <!doctype html>
+          <html lang="en">
+            <head>
+              <meta charset="utf-8" />
+              <title>CAPZ Prow Dashboard has moved</title>
+              <meta http-equiv="refresh" content="0; url=https://willie-yao.github.io/capz-prow-ai-dashboard/" />
+              <link rel="canonical" href="https://willie-yao.github.io/capz-prow-ai-dashboard/" />
+              <style>
+                body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 4rem auto; padding: 0 1rem; line-height: 1.5; }
+                a { color: #2563eb; }
+              </style>
+            </head>
+            <body>
+              <h1>This dashboard has moved</h1>
+              <p>The CAPZ Prow Dashboard is now at <a href="https://willie-yao.github.io/capz-prow-ai-dashboard/">willie-yao.github.io/capz-prow-ai-dashboard</a>.</p>
+              <p>Redirecting automatically&hellip; If nothing happens, follow the link above.</p>
+              <script>
+                window.location.replace("https://willie-yao.github.io/capz-prow-ai-dashboard/");
+              </script>
+            </body>
+          </html>
+          EOF
 
-      # --- Go data fetcher ---
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.22"
-          cache-dependency-path: backend/go.sum
-
-      - name: Build data fetcher
-        working-directory: backend
-        run: go build -o ../fetcher ./cmd/fetcher/
-
-      # Restore cached data (job JSON + AI cache) so we only fetch new builds
-      - name: Restore data cache
-        uses: actions/cache/restore@v4
-        with:
-          path: frontend/public/data
-          key: data-cache-${{ github.run_id }}
-          restore-keys: data-cache-
-
-      - name: Fetch test data
-        env:
-          AI_TOKEN: ${{ secrets.AI_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        run: ./fetcher -builds=8 -workers=5 -out=frontend/public/data -timeout=30m -ai
-
-      # Save data cache (job JSON + AI cache) for future runs
-      - name: Save data cache
-        if: always()
-        uses: actions/cache/save@v4
-        with:
-          path: frontend/public/data
-          key: data-cache-${{ github.run_id }}
-
-      # --- React frontend ---
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: Build frontend
-        working-directory: frontend
-        run: npm run build
-
-      # --- Deploy to GitHub Pages ---
       - uses: actions/configure-pages@v5
-
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: frontend/dist
-
+          path: site
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

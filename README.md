@@ -1,5 +1,12 @@
 # CAPZ Prow Dashboard
 
+> ⚠️ **This repo is archived in place.** Active development has moved to
+> [willie-yao/capz-prow-ai-dashboard](https://github.com/willie-yao/capz-prow-ai-dashboard),
+> which consumes the reusable engine at
+> [willie-yao/prow-ai-dashboard](https://github.com/willie-yao/prow-ai-dashboard).
+> The live site is now at <https://willie-yao.github.io/capz-prow-ai-dashboard/>
+> and this URL just redirects there. The code here is kept for history.
+
 A modern dashboard for [Cluster API Provider Azure (CAPZ)](https://github.com/kubernetes-sigs/cluster-api-provider-azure) prow E2E test results. Provides an alternative to the [TestGrid UI](https://testgrid.k8s.io/sig-cluster-lifecycle-cluster-api-provider-azure) with a purpose-built frontend that makes it easy to triage test health, investigate failures, and track flakiness.
 
 ## Features
